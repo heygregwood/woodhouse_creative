@@ -213,7 +213,8 @@ A dealer is "ready for customization" when all four items are validated:
 ```sql
 CREATE TABLE dealers (
     dealer_no TEXT PRIMARY KEY,  -- Allied Air assigned, 8-digit
-    dealer_name TEXT NOT NULL,
+    dealer_name TEXT NOT NULL,   -- From Allied API (ALL CAPS, with &)
+    display_name TEXT,           -- Clean name for posts/folders (proper case, no &)
     distributor_name TEXT,
     
     -- Program status
