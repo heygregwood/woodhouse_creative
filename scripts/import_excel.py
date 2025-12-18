@@ -175,14 +175,41 @@ def create_database():
     conn.commit()
     return conn
 
+# Track dummy dealer numbers for standardization
+_dummy_counter = 0
+
 def clean_dealer_no(value):
-    """Clean dealer number to string format."""
+    """Clean dealer number to string format.
+    
+    Handles:
+    - Normal integers: 10231005 -> "10231005"
+    - Floats: 10231005.0 -> "10231005"
+    - Scientific notation (dummy numbers): 1e-07 -> "TEMP-001"
+    - Very small decimals: 0.0000001 -> "TEMP-001"
+    """
+    global _dummy_counter
+    
     if pd.isna(value):
         return None
-    # Convert to string, handle floats
+    
+    # Check for scientific notation or very small numbers (dummy dealer numbers)
+    if isinstance(value, float):
+        if value < 1 or 'e' in str(value).lower():
+            _dummy_counter += 1
+            return f"TEMP-{_dummy_counter:03d}"
+    
+    # Convert to string
     s = str(value)
+    
+    # Handle scientific notation in string form
+    if 'e' in s.lower():
+        _dummy_counter += 1
+        return f"TEMP-{_dummy_counter:03d}"
+    
+    # Handle regular floats (remove decimal)
     if '.' in s:
         s = s.split('.')[0]
+    
     return s.strip() if s else None
 
 def clean_date(value):
