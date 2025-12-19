@@ -1,0 +1,19 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.facebook.com/profile.php?id=100091624600819",
+      "userData": {
+        "dealer_no": "10325016",
+        "display_name": "Brotherton's Heating & Air"
+      }
+    },
+    {
+      "url": "https://www.facebook.com/HeatingandCoolingCortina",
+      "userData": {
+        "dealer_no": "10042030",
+        "display_name": "Cortina Heating and Cooling"
+      }
+    }
+  ],
+  "resultsLimit": 100
+}

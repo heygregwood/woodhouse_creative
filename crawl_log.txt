@@ -1,0 +1,129 @@
+======================================================================
+ALLIED DEALER WEBSITE CRAWLER
+======================================================================
+Started: 2025-12-18 21:24:52
+
+Found 110 dealers with websites
+
+[  1/110] 247 Heating and Air                 | 247heatingandair.com      OK  1ph 1em 1soc
+[  2/110] 2B COOL Services                    | 0                         ERROR
+[  3/110] A and Z Mechanical                  | aandzmechanical.com       OK  1ph 0em 0soc
+[  4/110] Advanced Air Solutions Systems      | advancedairnc.com         OK  1ph 0em 0soc
+[  5/110] Air System Experts                  | rgvairsystemexperts.com   ERROR
+[  6/110] All Temp Heating and Cooling        | alltempsouthbend.com      OK  1ph 0em 1soc
+[  7/110] Arctic Air                          | arctictexas.com           OK  1ph 0em 1soc ✓
+[  8/110] Astro-Tex Air                       | astrotexair.com           OK  2ph 0em 2soc
+[  9/110] At Temp Mechanical                  | attempmechanical.com      OK  1ph 0em 1soc ✓
+[ 10/110] Atlantic Comfort Systems            | atlanticcomfortsystems.or OK  1ph 0em 0soc ✓
+[ 11/110] AccuMax Heating and Cooling         | accumaxinc.com            OK  1ph 1em 1soc
+[ 12/110] Advanced Solutions LLC              | advancedairsolutionsoh.co OK  1ph 0em 3soc ✓
+[ 13/110] Advantage Heating and Cooling       | hotairnow.com             OK  1ph 0em 2soc
+[ 14/110] Air 911 Heating and Cooling LLC     | air911hvac.com            OK  1ph 0em 2soc ✓
+[ 15/110] Air Repair Heating                  | airrepairsa.com           OK  1ph 0em 3soc
+[ 16/110] Air Technicians Inc.                | airtechnicians.com        OK  1ph 0em 1soc ✓
+[ 17/110] Airtech Mechanical Services, Inc.   | airtechnc.com/?utm_source OK  1ph 0em 0soc
+[ 18/110] Angleton Sheet metal                | asmhvacpro.com            OK  1ph 0em 0soc
+[ 19/110] Aquilla Air                         | aquillaair.com            OK  1ph 0em 0soc
+[ 20/110] Arctic Air Works, LLC               | arcticairworks.net        ERROR
+[ 21/110] Arctic Fire Heating and Cooling     | arcticfirehvac.net        ERROR
+[ 22/110] Art Smith and Son                   | artsmithandson.com        OK  1ph 0em 1soc
+[ 23/110] Aviation Mechanical LTD             | aviationmechanical.ca/?fb OK  2ph 0em 2soc ✓
+[ 24/110] B and C Plumbing and Heating        | bcplumbingheating.com     OK  1ph 1em 1soc
+[ 25/110] B and G Mechanical LLC              | bgmechanicalllc.com       OK  1ph 1em 2soc
+[ 26/110] Bilco                               | bilcoair.com              ERROR
+[ 27/110] Bill Mohn Heating and Cooling       | billmohnheatandac.com     OK  1ph 0em 1soc ✓
+[ 28/110] Blue Valley Heating and Cooling     | bluevalleyheatingcooling. OK  1ph 0em 4soc
+[ 29/110] Brian's Heating and Air Conditionin | briansheating.com         OK  1ph 0em 1soc
+[ 30/110] Campbells Heating and Cooling       | campbellsheatingandcoolin OK  5ph 0em 0soc
+[ 31/110] Chase Heating and Cooling           | chasemechhvac.com         OK  1ph 0em 2soc ✓
+[ 32/110] Clear Sky Heating and Air           | clearskyhvac.com          OK  1ph 0em 1soc
+[ 33/110] Comfort Connect Air Conditioning an | comfortconnectac.com      OK  1ph 0em 1soc
+[ 34/110] ComfortPro Solutions                | mycomfortpro.com          OK  1ph 1em 1soc
+[ 35/110] Carter Air                          | carterairheatcool.com     OK  0ph 0em 0soc
+[ 36/110] Centroplex                          | centroplexservice.com     OK  2ph 0em 1soc
+[ 37/110] Chipps Residential Services LLC     | crsheating.com            OK  1ph 1em 1soc ✓
+[ 38/110] Colorado Air Solutions              | coloradoairsolutions.com  OK  1ph 0em 1soc
+[ 39/110] Cool Experts AC                     | coolexpertsac.com         ERROR
+[ 40/110] Dave Lane's                         | davelaneair.com           OK  1ph 0em 4soc
+[ 41/110] Dunwiddie Heating, Air Conditioning | dunwiddieheating.com      OK  1ph 0em 1soc
+[ 42/110] Dye Plumbing and Heating Service Co | dyeplumbing.com           OK  1ph 0em 1soc ✓
+[ 43/110] DeLong and Sons HVAC                | delongandsonshvac.com     OK  1ph 0em 1soc
+[ 44/110] East Coast Mechanical Contractors   | ecmchvac.com              OK  1ph 1em 2soc ✓
+[ 45/110] Eco Systems Heating and Air         | g.co/kgs/wju1dvf          ERROR
+[ 46/110] Elite AC Solutions                  | eliteacsolution.com       OK  1ph 1em 1soc ✓
+[ 47/110] Everest Air Heating and Cooling     | everestairheatingandcooli ERROR
+[ 48/110] Fondas Plumbing and Heating         | fondasplumbing.ca         ERROR
+[ 49/110] Frank DeVos National Heating & Cool | frankdevos.com            OK  1ph 1em 0soc ✓
+[ 50/110] Frankum Ac                          | frankumac.com             OK  1ph 0em 1soc
+[ 51/110] G and L Services                    | glservicesinc.net         ERROR
+[ 52/110] GB Comfort Services                 | gbcomfortservices         ERROR
+[ 53/110] Otis Heating and Air Conditioning   | otisac.com                OK  1ph 0em 1soc ✓
+[ 54/110] Gering Valley Plumbing and Heating  | gvpman.com                OK  1ph 0em 2soc
+[ 55/110] Ginsel Heating                      | ginselhvac.com/contact    OK  1ph 0em 1soc
+[ 56/110] H and H Plumbing, Heating and Cooli | handhsupply.com           OK  2ph 0em 2soc ✓
+[ 57/110] HENSLEY HEATING & COOLING           | hensleyheatingandcooling. OK  1ph 0em 1soc
+[ 58/110] Hansen Heating, Plumbing, and Air C | hansenheatingandplumbing. OK  1ph 0em 2soc ✓
+[ 59/110] H.E.R.O. Heating and Air Conditioni | heroheating.com           OK  1ph 0em 2soc
+[ 60/110] High Performance                    | highperformancehomesystem ERROR
+[ 61/110] INTEGRITY AC                        | integrityacllc.net        OK  1ph 0em 1soc ✓
+[ 62/110] J. Golden Plumbing, Heating and Coo | jgoldenphc.com            ERROR
+[ 63/110] Justin Time Plumbing and Heating    | justintimeplumbingandheat OK  1ph 1em 1soc
+[ 64/110] Jeff's Heating and Cooling          | jeffsheatingandcooling.co ERROR
+[ 65/110] Jim and Dude's Plumbing Heating and | jimanddudes.com           OK  1ph 0em 1soc
+[ 66/110] KMK Heating and Air Conditioning    | kmkheating.com            OK  1ph 0em 0soc
+[ 67/110] Krooswyk Plumbing Heating and Air C | krooswykplumbingheating.c OK  1ph 0em 1soc
+[ 68/110] KTS Heating and Air                 | houstonsac.com/?utm_campa OK  1ph 0em 0soc ✓
+[ 69/110] Kennedy's Heating                   | kennedysheatingandair.net OK  1ph 0em 1soc
+[ 70/110] Kerr County A/C                     | kerrcountyac.com          OK  2ph 0em 2soc
+[ 71/110] Laramie Mechanical and Heating Syst | laramieheating.com        OK  2ph 0em 1soc
+[ 72/110] Lakefront Heating and Air           | lakefronthvac.com         OK  2ph 0em 1soc
+[ 73/110] Leonard Heating and A/C             | leonardheating.com/contac OK  1ph 0em 0soc ✓
+[ 74/110] Marcos AC                           | marcosac.com              OK  1ph 0em 2soc
+[ 75/110] MESQUITE HEATING                    | mesquiteheatingandair.com OK  2ph 1em 1soc
+[ 76/110] My Guys Heating and Air INC.        | myguysair.com             OK  1ph 0em 1soc
+[ 77/110] McDonald Mechanical                 | mcdonaldmechanicalservice OK  1ph 0em 3soc
+[ 78/110] Metro Maintenance                   | metro-maintenance.com     OK  1ph 0em 1soc
+[ 79/110] NC Heating and Air                  | myhvacfriend.com          OK  1ph 0em 1soc ✓
+[ 80/110] NSG Heating and Air Specialists, LL | nsgair.com                OK  0ph 0em 2soc
+[ 81/110] North Country Plumbing and Heating  | northcountryplumbing.com  OK  1ph 0em 1soc
+[ 82/110] Northern Air Plumbing and Heating   | northernairplumbing.com   OK  1ph 0em 2soc
+[ 83/110] O T T Mechanical                    | ottmechanical.com         OK  1ph 0em 1soc
+[ 84/110] Plumbers Mechanical Group, LLC      | pmgllcmn.com              OK  1ph 0em 0soc ✓
+[ 85/110] PUTNAM SERVICE                      | 0                         ERROR
+[ 86/110] Paramount Plumbing, Heating and Air | paramountplumbinghvac.com OK  1ph 0em 3soc ✓
+[ 87/110] Patriot Plumbing, Heating and AC    | patriotlincoln.com        OK  1ph 1em 1soc ✓
+[ 88/110] Peace Heating & Air                 | peaceheatingandairconditi OK  1ph 1em 4soc
+[ 89/110] Perfection Heating and Air Conditio | perfectionheating.com     OK  1ph 0em 1soc ✓
+[ 90/110] Premier Services Group, Inc         | premierserviceshvac.com   OK  2ph 0em 3soc ✓
+[ 91/110] Priority One Heating and Cooling    | callpriorityone.com       OK  1ph 1em 1soc
+[ 92/110] R and P Heating and Cooling         | rphvac.com                OK  1ph 1em 1soc
+[ 93/110] Ron's Heating & Cooling             | ronsheatingandcooling.com ERROR
+[ 94/110] Scott Plumbing & Heating Co, INC    | scottph.com               OK  1ph 0em 1soc
+[ 95/110] Sgt. Paul Heat and Air Conditioning | sgtpaulheatandair.com     ERROR
+[ 96/110] Stephany Heating and Air Conditioni | stephanyheating.com       OK  1ph 0em 0soc ✓
+[ 97/110] Santos Mechanical LLC               | santosmechanical.com      OK  1ph 0em 1soc ✓
+[ 98/110] Simply Comfortable Heating and Cool | simplycomfortable.com     ERROR
+[ 99/110] Smart Air LLC                       | smartairhvac.com          OK  1ph 0em 1soc ✓
+[100/110] Sonnyreena mechanical               | sonnyair.com              ERROR
+[101/110] Standard Plumbing, Heating, and AC  | standardphc.com           OK  1ph 0em 1soc ✓
+[102/110] Stocker Heating and Cooling         | stockerheating.com        OK  1ph 0em 1soc
+[103/110] Texcellent                          | texcellentacservice.com   OK  3ph 0em 3soc
+[104/110] Total Comfort Air                   | totalcomfortbcs.com       OK  2ph 1em 2soc
+[105/110] Tri City Heating and Air            | tricityheating-air.com    OK  1ph 1em 2soc
+[106/110] Trotter Air Services                | trotterair.com            OK  1ph 0em 1soc ✓
+[107/110] Turner Refrigeration LLC            | turnerrefrigeration.com   OK  1ph 1em 0soc
+[108/110] Unique Heating and Cooling          | uniqueheatcooling.com     OK  1ph 0em 1soc
+[109/110] UNIVERSAL CLIMATE                   | universalclimatecontrol.c OK  1ph 0em 1soc
+[110/110] Williamson's AC                     | williamsonac.com/?utm_sou OK  1ph 0em 1soc ✓
+
+======================================================================
+SUMMARY
+======================================================================
+Successful:  91
+Errors:      19
+Blocked:     0
+New phones:  13
+New emails:  4
+New social:  26
+
+Finished: 2025-12-18 21:28:59
