@@ -18,12 +18,12 @@ const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
  * GET /api/cron/process-render-queue
  *
  * Processes pending render jobs from the queue
- * - Takes 10 pending jobs (rate limit safety)
- * - Calls Creatomate API for each
+ * - Takes 25 pending jobs per run (Creatomate allows 30 req/10s)
+ * - Calls Creatomate API for each with minimal delay
  * - Updates job status to "processing"
- * - Waits 350ms between calls (rate limit: 30 req/10s = ~3 req/sec)
  *
- * This endpoint should be called by Vercel Cron every 1 minute
+ * Rate limit math: 30 req/10s = 180/min. We do 25/min to stay safe.
+ * This endpoint is called by Vercel Cron every 1 minute.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
       errors: [] as string[],
     };
 
-    // Get up to 10 pending jobs
-    const pendingJobs = await getPendingRenderJobs(10);
+    // Get up to 25 pending jobs (safe margin under 30 req/10s limit)
+    const pendingJobs = await getPendingRenderJobs(25);
 
     if (pendingJobs.length === 0) {
       return NextResponse.json({
@@ -131,12 +131,6 @@ export async function GET(request: NextRequest) {
 
         results.succeeded++;
         console.log(`✅ Started render for ${dealer.display_name} (renderId: ${renderId})`);
-
-        // Rate limit: Wait 350ms between API calls
-        // This gives us ~10 renders/minute, well under the 30 req/10s limit
-        if (results.processed < pendingJobs.length) {
-          await new Promise((resolve) => setTimeout(resolve, 350));
-        }
       } catch (error) {
         results.failed++;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
