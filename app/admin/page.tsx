@@ -57,6 +57,20 @@ export default function CreativeAdminPage() {
   const [processingDealer, setProcessingDealer] = useState<string | null>(null);
   const [processResults, setProcessResults] = useState<Record<string, { success: boolean; error?: string }>>({});
 
+  // Populate Post Copy State
+  const [populatePostNumber, setPopulatePostNumber] = useState('');
+  const [populateLoading, setPopulateLoading] = useState(false);
+  const [populateResult, setPopulateResult] = useState<{
+    success?: boolean;
+    error?: string;
+    dryRun?: boolean;
+    baseCopy?: string;
+    totalDealers?: number;
+    totalUpdated?: number;
+    preview?: { dealerNo: string; name: string; copy: string }[];
+    message?: string;
+  } | null>(null);
+
   // Fetch dealers with "Done" status
   const fetchDoneDealers = useCallback(async () => {
     try {
@@ -252,6 +266,49 @@ export default function CreativeAdminPage() {
       }
     }
     setBatchStatuses(statuses);
+  };
+
+  // Preview post copy population
+  const handlePreviewPopulate = async () => {
+    if (!populatePostNumber) return;
+
+    try {
+      setPopulateLoading(true);
+      setPopulateResult(null);
+
+      const response = await fetch(`/api/admin/populate-post-copy?postNumber=${populatePostNumber}`);
+      const data = await response.json();
+      setPopulateResult(data);
+    } catch (error) {
+      setPopulateResult({
+        error: error instanceof Error ? error.message : 'Failed to preview',
+      });
+    } finally {
+      setPopulateLoading(false);
+    }
+  };
+
+  // Execute post copy population
+  const handlePopulatePostCopy = async () => {
+    if (!populatePostNumber) return;
+
+    try {
+      setPopulateLoading(true);
+
+      const response = await fetch('/api/admin/populate-post-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postNumber: parseInt(populatePostNumber) }),
+      });
+      const data = await response.json();
+      setPopulateResult(data);
+    } catch (error) {
+      setPopulateResult({
+        error: error instanceof Error ? error.message : 'Failed to populate',
+      });
+    } finally {
+      setPopulateLoading(false);
+    }
   };
 
   const hasChanges = syncResult?.changes && (
@@ -646,6 +703,107 @@ export default function CreativeAdminPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Populate Post Copy Section */}
+        <div className="mt-6">
+          <div className="bg-white border-2 border-purple-500 rounded-lg shadow-lg overflow-hidden">
+            <div className="bg-purple-500 px-6 py-4 border-b-2 border-purple-600">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Populate Post Copy</h2>
+                  <p className="text-sm text-white/90 mt-1">
+                    Fill in personalized copy for all dealers in the scheduling spreadsheet
+                  </p>
+                </div>
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                >
+                  Open Spreadsheet
+                </a>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 max-w-xs">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Post Number
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none"
+                    value={populatePostNumber}
+                    onChange={(e) => setPopulatePostNumber(e.target.value)}
+                    placeholder="e.g., 666"
+                  />
+                </div>
+                <button
+                  onClick={handlePreviewPopulate}
+                  disabled={populateLoading || !populatePostNumber}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 font-medium transition-colors"
+                >
+                  {populateLoading ? 'Loading...' : 'Preview'}
+                </button>
+                <button
+                  onClick={handlePopulatePostCopy}
+                  disabled={populateLoading || !populatePostNumber}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-300 font-medium transition-colors"
+                >
+                  {populateLoading ? 'Populating...' : 'Populate All'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-2">
+                Replaces {'{phone}'}, {'{website}'}, {'{name}'} in base copy (column C) with each dealer&apos;s values
+              </p>
+
+              {/* Result */}
+              {populateResult && (
+                <div className="mt-4">
+                  {populateResult.error ? (
+                    <div className="p-4 bg-red-50 border border-red-500 rounded-lg text-red-800">
+                      <p className="font-medium">Error</p>
+                      <p className="text-sm mt-1">{populateResult.error}</p>
+                    </div>
+                  ) : (
+                    <div className={`p-4 rounded-lg ${populateResult.dryRun ? 'bg-purple-50 border border-purple-400' : 'bg-green-50 border border-green-500'}`}>
+                      <p className={`font-medium ${populateResult.dryRun ? 'text-purple-800' : 'text-green-800'}`}>
+                        {populateResult.dryRun ? 'Preview' : 'Success!'}
+                      </p>
+                      <p className={`text-sm mt-1 ${populateResult.dryRun ? 'text-purple-700' : 'text-green-700'}`}>
+                        {populateResult.message}
+                      </p>
+
+                      {populateResult.baseCopy && (
+                        <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                          <p className="text-xs font-medium text-gray-500 mb-1">Base Copy (Column C):</p>
+                          <p className="text-sm text-gray-800">{populateResult.baseCopy}</p>
+                        </div>
+                      )}
+
+                      {populateResult.preview && populateResult.preview.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-medium text-gray-500 mb-2">Sample Output (first 5 dealers):</p>
+                          <div className="space-y-2">
+                            {populateResult.preview.map((item) => (
+                              <div key={item.dealerNo} className="p-2 bg-white rounded border border-gray-200">
+                                <p className="text-xs font-medium text-gray-600">{item.name} ({item.dealerNo})</p>
+                                <p className="text-sm text-gray-800 mt-0.5">{item.copy}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
