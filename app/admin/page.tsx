@@ -73,10 +73,41 @@ export default function CreativeAdminPage() {
     }
   }, []);
 
-  // Load done dealers on mount
+  // Fetch active batches on mount
+  const fetchActiveBatches = useCallback(async () => {
+    try {
+      const response = await fetch('/api/creative/active-batches');
+      const data = await response.json();
+      if (data.batches && data.batches.length > 0) {
+        const ids = data.batches.map((b: any) => b.batchId);
+        setBatchIds(ids);
+        // Also fetch full status for each
+        const statuses: Record<string, any> = {};
+        for (const batch of data.batches) {
+          statuses[batch.batchId] = {
+            postNumber: batch.postNumber,
+            status: batch.status,
+            progress: {
+              total: batch.totalJobs,
+              completed: batch.completedJobs,
+              failed: batch.failedJobs,
+              pending: batch.pendingJobs,
+              processing: batch.processingJobs,
+            },
+          };
+        }
+        setBatchStatuses(statuses);
+      }
+    } catch (error) {
+      console.error('Failed to fetch active batches:', error);
+    }
+  }, []);
+
+  // Load done dealers and active batches on mount
   useEffect(() => {
     fetchDoneDealers();
-  }, [fetchDoneDealers]);
+    fetchActiveBatches();
+  }, [fetchDoneDealers, fetchActiveBatches]);
 
   // Process a single dealer
   const handleProcessDealer = async (dealer: DoneDealer) => {
