@@ -127,9 +127,11 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Downloaded video: ${videoBuffer.byteLength} bytes`);
 
         // Upload to Google Drive
-        // Path: Dealers/{BusinessName}/Post_{PostNumber}.mp4
-        const fileName = `Post_${metadata.postNumber}_${job.businessName.replace(/[/\\?%*:|"<>]/g, '-')}.mp4`;
-        const folderPath = `Dealers/${job.businessName.replace(/[/\\?%*:|"<>]/g, '-')}`;
+        // Format: Post {PostNumber}_{display_name}.mp4 (matches existing convention)
+        // Path: Dealers/{BusinessName}/
+        const sanitizedName = job.businessName.replace(/[/\\?%*:|"<>]/g, '-');
+        const fileName = `Post ${metadata.postNumber}_${sanitizedName}.mp4`;
+        const folderPath = `Dealers/${sanitizedName}`;
 
         console.log(`Uploading to Google Drive: ${folderPath}/${fileName}`);
 

@@ -8,6 +8,8 @@ import type {
 } from './types/renderQueue';
 import crypto from 'crypto';
 
+// Creatomate API v1 is the current stable version
+// Docs: https://creatomate.com/docs/api/introduction
 const CREATOMATE_API_BASE = 'https://api.creatomate.com/v1';
 
 /**

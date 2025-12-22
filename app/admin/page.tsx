@@ -1,174 +1,183 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-interface Dealer {
-  contactFirstName: string;
-  publicCompanyPhone: string;
-  publicCompanyName: string;
-  publicWebAddress?: string;
-  logoShareUrl: string;
-  dealerNo?: string;
-  contactEmail?: string;
+interface DoneDealer {
+  dealer_no: string;
+  first_name: string;
+  email: string;
+  column: number;
+  col_letter: string;
+  has_received_first_post: boolean;
+  email_type: 'first_post' | 'post_scheduled';
 }
 
-interface Duplicate {
-  imported: Dealer;
-  existing: {
-    id: string;
-    businessName: string;
-    phone: string;
-    website: string;
-    logoUrl: string;
-    dealerNo?: string;
-  };
-  matchType: 'name' | 'dealerNo';
+interface SyncChanges {
+  new: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
+  removed: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
+  updated: Array<{ dealer_no: string; dealer_name: string; changes: string[] }>;
+  unchanged: number;
+}
+
+interface SyncResult {
+  success: boolean;
+  changes?: SyncChanges;
+  error?: string;
+  output?: string;
+  autoApplied?: boolean;
+  emailsSent?: number;
+  emailsFailed?: number;
+  emailResults?: Array<{ dealer_no: string; email_type?: string; success: boolean; error?: string }>;
+  pendingReviewCount?: number;
+  pendingReviewDealers?: string[];
+}
+
+interface BatchInput {
+  postNumber: string;
+  templateId: string;
 }
 
 export default function CreativeAdminPage() {
-  // CSV Import State
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<any>(null);
-  const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
-  const [resolvingDuplicates, setResolvingDuplicates] = useState(false);
-
-  // Render State
-  const [postNumber, setPostNumber] = useState('');
-  const [templateId, setTemplateId] = useState('603f269d-8019-40b9-8cc5-b4e1829b05bd');
+  // Render State - now supports multiple batches
+  const [batchInputs, setBatchInputs] = useState<BatchInput[]>([
+    { postNumber: '', templateId: '' }
+  ]);
   const [rendering, setRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<any>(null);
-  const [batchId, setBatchId] = useState<string | null>(null);
-  const [batchStatus, setBatchStatus] = useState<any>(null);
+  const [batchIds, setBatchIds] = useState<string[]>([]);
+  const [batchStatuses, setBatchStatuses] = useState<Record<string, any>>({});
 
-  // Parse CSV file to JSON
-  const parseCSV = (text: string): Dealer[] => {
-    const lines = text.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(',').map(h => h.trim());
+  // Excel Sync State
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
-    return lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim());
-      const dealer: any = {};
+  // Process Done State
+  const [doneDealers, setDoneDealers] = useState<DoneDealer[]>([]);
+  const [loadingDone, setLoadingDone] = useState(false);
+  const [processingDealer, setProcessingDealer] = useState<string | null>(null);
+  const [processResults, setProcessResults] = useState<Record<string, { success: boolean; error?: string }>>({});
 
-      headers.forEach((header, index) => {
-        dealer[header] = values[index] || '';
-      });
-
-      return dealer;
-    });
-  };
-
-  // Handle CSV file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type === 'text/csv') {
-      setCsvFile(file);
-      setImportResult(null);
-      setDuplicates([]);
-    } else {
-      alert('Please select a valid CSV file');
-    }
-  };
-
-  // Import dealers from CSV
-  const handleImport = async () => {
-    if (!csvFile) return;
-
+  // Fetch dealers with "Done" status
+  const fetchDoneDealers = useCallback(async () => {
     try {
-      setImporting(true);
-      setImportResult(null);
-      setDuplicates([]);
-
-      // Read CSV file
-      const text = await csvFile.text();
-      const dealers = parseCSV(text);
-
-      // Send to API for duplicate check
-      const response = await fetch('/api/creative/import-dealers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealers, checkDuplicates: true }),
-      });
-
+      setLoadingDone(true);
+      const response = await fetch('/api/admin/process-done');
       const data = await response.json();
-
-      if (data.duplicates && data.duplicates.length > 0) {
-        // Show duplicates for resolution
-        setDuplicates(data.duplicates);
-        setImportResult({
-          success: true,
-          message: `Found ${data.duplicates.length} duplicate(s). Please resolve them below.`,
-          imported: data.imported || 0,
-        });
-      } else {
-        // No duplicates, import successful
-        setImportResult({
-          success: true,
-          message: data.message || `Successfully imported ${data.imported} dealer(s)`,
-          imported: data.imported || 0,
-        });
-        setCsvFile(null);
+      if (data.success) {
+        setDoneDealers(data.dealers || []);
       }
     } catch (error) {
-      setImportResult({
-        success: false,
-        message: error instanceof Error ? error.message : 'Import failed',
-      });
+      console.error('Failed to fetch done dealers:', error);
     } finally {
-      setImporting(false);
+      setLoadingDone(false);
     }
-  };
+  }, []);
 
-  // Resolve duplicate - keep imported or keep existing
-  const handleResolveDuplicate = async (index: number, keepImported: boolean) => {
-    const duplicate = duplicates[index];
+  // Load done dealers on mount
+  useEffect(() => {
+    fetchDoneDealers();
+  }, [fetchDoneDealers]);
 
+  // Process a single dealer
+  const handleProcessDealer = async (dealer: DoneDealer) => {
+    setProcessingDealer(dealer.dealer_no);
     try {
-      setResolvingDuplicates(true);
-
-      const response = await fetch('/api/creative/resolve-duplicate', {
+      const response = await fetch('/api/admin/process-done', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imported: duplicate.imported,
-          existingId: duplicate.existing.id,
-          keepImported,
+          dealer_no: dealer.dealer_no,
+          email_type: dealer.email_type,
         }),
       });
-
-      if (response.ok) {
-        // Remove resolved duplicate from list
-        const newDuplicates = duplicates.filter((_, i) => i !== index);
-        setDuplicates(newDuplicates);
-
-        if (newDuplicates.length === 0) {
-          setImportResult({
-            success: true,
-            message: 'All duplicates resolved! Import complete.',
-          });
-          setCsvFile(null);
-        }
+      const data = await response.json();
+      setProcessResults((prev) => ({
+        ...prev,
+        [dealer.dealer_no]: { success: data.success, error: data.error },
+      }));
+      if (data.success) {
+        // Remove from list after success
+        setDoneDealers((prev) => prev.filter((d) => d.dealer_no !== dealer.dealer_no));
       }
     } catch (error) {
-      alert('Failed to resolve duplicate');
+      setProcessResults((prev) => ({
+        ...prev,
+        [dealer.dealer_no]: { success: false, error: 'Network error' },
+      }));
     } finally {
-      setResolvingDuplicates(false);
+      setProcessingDealer(null);
     }
   };
 
-  // Start batch render
+  // Process all dealers
+  const handleProcessAll = async () => {
+    for (const dealer of doneDealers) {
+      await handleProcessDealer(dealer);
+    }
+  };
+
+  // Sync from Excel - auto-applies all changes and sends appropriate emails
+  const handleCheckExcel = async () => {
+    try {
+      setSyncing(true);
+      setSyncResult(null);
+
+      const response = await fetch('/api/admin/sync-excel');
+      const data = await response.json();
+
+      setSyncResult(data);
+    } catch (error) {
+      setSyncResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to sync from Excel',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Add a new batch input row
+  const handleAddBatch = () => {
+    setBatchInputs([...batchInputs, { postNumber: '', templateId: '' }]);
+  };
+
+  // Remove a batch input row
+  const handleRemoveBatch = (index: number) => {
+    if (batchInputs.length > 1) {
+      setBatchInputs(batchInputs.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a batch input
+  const handleBatchChange = (index: number, field: 'postNumber' | 'templateId', value: string) => {
+    const newInputs = [...batchInputs];
+    newInputs[index][field] = value;
+    setBatchInputs(newInputs);
+  };
+
+  // Start batch render (supports multiple batches)
   const handleStartRender = async () => {
+    // Filter out empty rows
+    const validBatches = batchInputs.filter(b => b.postNumber && b.templateId);
+
+    if (validBatches.length === 0) {
+      setRenderResult({ error: 'Please enter at least one post number and template ID' });
+      return;
+    }
+
     try {
       setRendering(true);
       setRenderResult(null);
-      setBatchStatus(null);
+      setBatchStatuses({});
 
       const response = await fetch('/api/creative/render-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postNumber: parseInt(postNumber),
-          templateId,
+          batches: validBatches.map(b => ({
+            postNumber: parseInt(b.postNumber),
+            templateId: b.templateId,
+          })),
         }),
       });
 
@@ -176,7 +185,9 @@ export default function CreativeAdminPage() {
 
       if (response.ok) {
         setRenderResult(data);
-        setBatchId(data.batchId);
+        // Store all batch IDs for status tracking
+        const ids = data.batches?.filter((b: any) => b.batchId).map((b: any) => b.batchId) || [];
+        setBatchIds(ids);
       } else {
         setRenderResult({ error: data.error || 'Failed to start render' });
       }
@@ -189,251 +200,357 @@ export default function CreativeAdminPage() {
     }
   };
 
-  // Check batch status
+  // Check status for all batches
   const handleCheckStatus = async () => {
-    if (!batchId) return;
+    if (batchIds.length === 0) return;
 
-    try {
-      const response = await fetch(`/api/creative/render-batch?batchId=${batchId}`);
-      const data = await response.json();
-
-      if (response.ok) {
-        setBatchStatus(data);
-      } else {
-        setBatchStatus({ error: data.error || 'Failed to get status' });
+    const statuses: Record<string, any> = {};
+    for (const batchId of batchIds) {
+      try {
+        const response = await fetch(`/api/creative/render-batch?batchId=${batchId}`);
+        const data = await response.json();
+        if (response.ok) {
+          statuses[batchId] = data;
+        } else {
+          statuses[batchId] = { error: data.error || 'Failed to get status' };
+        }
+      } catch (error) {
+        statuses[batchId] = {
+          error: error instanceof Error ? error.message : 'Failed to get status',
+        };
       }
-    } catch (error) {
-      setBatchStatus({
-        error: error instanceof Error ? error.message : 'Failed to get status',
-      });
     }
+    setBatchStatuses(statuses);
   };
 
+  const hasChanges = syncResult?.changes && (
+    syncResult.changes.new.length > 0 ||
+    syncResult.changes.removed.length > 0 ||
+    syncResult.changes.updated.length > 0
+  );
+
+  // Check if changes were auto-applied (new dealers found)
+  const autoApplied = syncResult?.autoApplied === true;
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold">Woodhouse Creative Automation</h1>
-          <p className="text-[#d7e7fd] mt-1">Manage dealers and video rendering</p>
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Woodhouse Creative Automation</h1>
+            <p className="text-[#d7e7fd] mt-1">124 FULL dealers ready for automation</p>
+          </div>
+          <div className="flex gap-3">
+            <a
+              href="/admin/posts"
+              className="px-4 py-2 bg-[#c87a3e] rounded-lg hover:bg-[#b36a35] transition-colors font-medium"
+            >
+              Post Workflow
+            </a>
+            <a
+              href="/admin/email-templates"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
+            >
+              Email Templates
+            </a>
+            <a
+              href="/admin/dealer-review"
+              className="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-lg hover:bg-yellow-300 transition-colors font-medium"
+            >
+              Dealer Review
+            </a>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-5xl mx-auto p-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Dealer Management */}
+          {/* Left Column: Excel Sync */}
           <div>
             <div className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden">
               <div className="bg-[#74a9de] px-6 py-4 border-b-2 border-[#5378a8]">
-                <h2 className="text-xl font-bold text-[#000000]">Import Dealers</h2>
-                <p className="text-sm text-[#000000] mt-1">Upload CSV to add new dealers</p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold text-black">Sync from Allied Excel</h2>
+                    <p className="text-sm text-black/70 mt-1">Check for new/changed dealers</p>
+                  </div>
+                  <a
+                    href="https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4?e=0MwJgK"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs px-2 py-1 bg-white/50 hover:bg-white/80 rounded text-black/70 hover:text-black transition-colors"
+                  >
+                    Open Excel
+                  </a>
+                </div>
               </div>
 
               <div className="p-6 space-y-4">
-                {/* File Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-[#000000] mb-2">
-                    Upload CSV File
-                  </label>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-[#000000]
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded file:border-0
-                      file:text-sm file:font-semibold
-                      file:bg-[#c87a3e] file:text-white
-                      hover:file:bg-[#b36a35]
-                      cursor-pointer border-2 border-[#d7e7fd] rounded-lg"
-                  />
-                  {csvFile && (
-                    <p className="text-sm text-[#5378a8] mt-2">
-                      Selected: {csvFile.name}
-                    </p>
-                  )}
-                </div>
-
-                {/* Import Button */}
                 <button
-                  onClick={handleImport}
-                  disabled={!csvFile || importing}
-                  className="w-full px-6 py-3 bg-[#c87a3e] text-white rounded-lg hover:bg-[#b36a35] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold text-lg transition-colors border-2 border-[#000000]"
+                  onClick={handleCheckExcel}
+                  disabled={syncing}
+                  className="w-full px-6 py-3 bg-[#5378a8] text-white rounded-lg hover:bg-[#4a6890] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
                 >
-                  {importing ? 'Importing...' : 'Import Dealers'}
+                  {syncing ? 'Syncing...' : 'Sync from Excel'}
                 </button>
+                <p className="text-xs text-gray-500 text-center">
+                  New dealers are auto-added with welcome emails
+                </p>
 
-                {/* Import Result */}
-                {importResult && (
-                  <div
-                    className={`p-4 rounded-lg border-2 ${
-                      importResult.success
-                        ? 'bg-green-50 border-green-500'
-                        : 'bg-red-50 border-red-500'
-                    }`}
-                  >
-                    <p className={`font-medium ${importResult.success ? 'text-green-900' : 'text-red-900'}`}>
-                      {importResult.success ? '✅ Success' : '❌ Error'}
-                    </p>
-                    <p className={`text-sm mt-1 ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                      {importResult.message}
-                    </p>
-                  </div>
-                )}
-
-                {/* Duplicates Resolution */}
-                {duplicates.length > 0 && (
-                  <div className="space-y-4 mt-6">
-                    <h3 className="font-bold text-[#000000] text-lg border-b-2 border-[#c87a3e] pb-2">
-                      Resolve Duplicates ({duplicates.length})
-                    </h3>
-
-                    {duplicates.map((dup, index) => (
-                      <div key={index} className="border-2 border-[#5378a8] rounded-lg p-4 bg-[#d7e7fd]">
-                        <p className="font-medium text-[#000000] mb-3">
-                          Duplicate found: {dup.imported.publicCompanyName}
-                          <span className="text-sm text-[#5378a8] ml-2">
-                            (matched by {dup.matchType})
-                          </span>
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          {/* Imported Data */}
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de]">
-                            <p className="text-xs font-semibold text-[#c87a3e] mb-2">NEW DATA (CSV)</p>
-                            <div className="text-sm text-[#000000] space-y-1">
-                              <p><strong>Name:</strong> {dup.imported.publicCompanyName}</p>
-                              <p><strong>Phone:</strong> {dup.imported.publicCompanyPhone}</p>
-                              <p><strong>Website:</strong> {dup.imported.publicWebAddress || 'N/A'}</p>
-                              {dup.imported.dealerNo && <p><strong>Dealer #:</strong> {dup.imported.dealerNo}</p>}
-                            </div>
-                          </div>
-
-                          {/* Existing Data */}
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de]">
-                            <p className="text-xs font-semibold text-[#5378a8] mb-2">EXISTING (Database)</p>
-                            <div className="text-sm text-[#000000] space-y-1">
-                              <p><strong>Name:</strong> {dup.existing.businessName}</p>
-                              <p><strong>Phone:</strong> {dup.existing.phone}</p>
-                              <p><strong>Website:</strong> {dup.existing.website || 'N/A'}</p>
-                              {dup.existing.dealerNo && <p><strong>Dealer #:</strong> {dup.existing.dealerNo}</p>}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Resolution Buttons */}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleResolveDuplicate(index, true)}
-                            disabled={resolvingDuplicates}
-                            className="flex-1 px-4 py-2 bg-[#c87a3e] text-white rounded hover:bg-[#b36a35] disabled:bg-gray-300 font-medium"
-                          >
-                            Keep New
-                          </button>
-                          <button
-                            onClick={() => handleResolveDuplicate(index, false)}
-                            disabled={resolvingDuplicates}
-                            className="flex-1 px-4 py-2 bg-[#5378a8] text-white rounded hover:bg-[#4a6890] disabled:bg-gray-300 font-medium"
-                          >
-                            Keep Existing
-                          </button>
-                        </div>
+                {/* Sync Result */}
+                {syncResult && (
+                  <div className="space-y-4">
+                    {syncResult.error ? (
+                      <div className="p-4 bg-red-50 border border-red-500 rounded-lg text-red-800">
+                        <p className="font-medium">Error</p>
+                        <p className="text-sm mt-1">{syncResult.error}</p>
                       </div>
-                    ))}
+                    ) : syncResult.changes && (
+                      <>
+                        {/* Summary */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className={`p-3 rounded-lg text-center ${syncResult.changes.new.length > 0 ? 'bg-green-50 border border-green-400' : 'bg-gray-50 border border-gray-200'}`}>
+                            <p className={`text-2xl font-bold ${syncResult.changes.new.length > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                              {syncResult.changes.new.length}
+                            </p>
+                            <p className="text-xs text-gray-600">New</p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${syncResult.changes.updated.length > 0 ? 'bg-yellow-50 border border-yellow-400' : 'bg-gray-50 border border-gray-200'}`}>
+                            <p className={`text-2xl font-bold ${syncResult.changes.updated.length > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                              {syncResult.changes.updated.length}
+                            </p>
+                            <p className="text-xs text-gray-600">Updated</p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${syncResult.changes.removed.length > 0 ? 'bg-red-50 border border-red-400' : 'bg-gray-50 border border-gray-200'}`}>
+                            <p className={`text-2xl font-bold ${syncResult.changes.removed.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                              {syncResult.changes.removed.length}
+                            </p>
+                            <p className="text-xs text-gray-600">Removed</p>
+                          </div>
+                        </div>
+
+                        {/* Auto-applied results */}
+                        {autoApplied && (
+                          <div className="p-4 bg-green-50 border border-green-400 rounded-lg">
+                            <p className="font-semibold text-green-800">Changes Applied!</p>
+                            <p className="text-sm text-green-700 mt-1">
+                              {(syncResult.changes?.new.length || 0) > 0 && `${syncResult.changes?.new.length} new dealer(s) added. `}
+                              {(syncResult.changes?.updated.length || 0) > 0 && `${syncResult.changes?.updated.length} dealer(s) updated. `}
+                              {(syncResult.changes?.removed.length || 0) > 0 && `${syncResult.changes?.removed.length} dealer(s) removed.`}
+                            </p>
+                            {(syncResult.emailsSent || 0) > 0 && (
+                              <p className="text-sm text-green-700">
+                                {syncResult.emailsSent} welcome email(s) sent
+                              </p>
+                            )}
+                            {(syncResult.emailsFailed || 0) > 0 && (
+                              <p className="text-sm text-red-700">
+                                {syncResult.emailsFailed} email(s) failed to send
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Pending Review Notice */}
+                        {(syncResult.pendingReviewCount || 0) > 0 && (
+                          <div className="p-4 bg-yellow-50 border border-yellow-400 rounded-lg">
+                            <p className="font-semibold text-yellow-800">
+                              {syncResult.pendingReviewCount} dealer(s) promoted to FULL - Review Required
+                            </p>
+                            <p className="text-sm text-yellow-700 mt-1">
+                              These dealers need logo and display name validation before being added to the scheduling spreadsheet.
+                            </p>
+                            <a
+                              href="/admin/dealer-review"
+                              className="inline-block mt-3 px-4 py-2 bg-yellow-400 text-yellow-900 rounded-lg hover:bg-yellow-300 transition-colors font-medium text-sm"
+                            >
+                              Review Now
+                            </a>
+                          </div>
+                        )}
+
+                        {/* New Dealers List (after auto-apply) */}
+                        {syncResult.changes.new.length > 0 && autoApplied && (
+                          <div className="border border-green-400 rounded-lg overflow-hidden">
+                            <div className="bg-green-50 px-4 py-2 border-b border-green-400">
+                              <p className="font-semibold text-green-800">New Dealers Added</p>
+                            </div>
+                            <div className="divide-y divide-green-200">
+                              {syncResult.changes.new.map((dealer) => {
+                                const emailResult = syncResult.emailResults?.find(e => e.dealer_no === dealer.dealer_no);
+                                return (
+                                  <div key={dealer.dealer_no} className="p-3 bg-white flex justify-between items-center">
+                                    <div>
+                                      <p className="font-medium text-gray-900">{dealer.dealer_name}</p>
+                                      <p className="text-sm text-gray-500">#{dealer.dealer_no} - {dealer.program_status}</p>
+                                    </div>
+                                    <span className={`text-xs px-2 py-1 rounded ${emailResult?.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      {emailResult?.success ? 'Email Sent' : 'Email Failed'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Updated Dealers List */}
+                        {syncResult.changes.updated.length > 0 && autoApplied && (
+                          <div className="border border-yellow-400 rounded-lg overflow-hidden">
+                            <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-400">
+                              <p className="font-semibold text-yellow-800">Updated Dealers</p>
+                            </div>
+                            <div className="divide-y divide-yellow-200 max-h-60 overflow-y-auto">
+                              {syncResult.changes.updated.map((dealer) => {
+                                const wasPromoted = dealer.changes?.some(c => c.includes('program_status') && c.includes('FULL') && (c.includes('CONTENT') || c.includes('NEW')));
+                                return (
+                                  <div key={dealer.dealer_no} className="p-3 bg-white">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <p className="font-medium text-gray-900">{dealer.dealer_name}</p>
+                                        <p className="text-sm text-gray-500">#{dealer.dealer_no}</p>
+                                      </div>
+                                      {wasPromoted && (
+                                        <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700">
+                                          Needs Review
+                                        </span>
+                                      )}
+                                    </div>
+                                    {dealer.changes && dealer.changes.length > 0 && (
+                                      <div className="mt-1 space-y-0.5">
+                                        {dealer.changes.map((change, idx) => (
+                                          <p key={idx} className="text-xs text-yellow-700 font-mono">
+                                            {change}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Removed Dealers List */}
+                        {syncResult.changes.removed.length > 0 && autoApplied && (
+                          <div className="border border-red-400 rounded-lg overflow-hidden">
+                            <div className="bg-red-50 px-4 py-2 border-b border-red-400">
+                              <p className="font-semibold text-red-800">Removed Dealers</p>
+                            </div>
+                            <div className="divide-y divide-red-200">
+                              {syncResult.changes.removed.map((dealer) => (
+                                <div key={dealer.dealer_no} className="p-3 bg-white">
+                                  <p className="font-medium text-gray-900">{dealer.dealer_name}</p>
+                                  <p className="text-sm text-gray-500">#{dealer.dealer_no}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* No Changes */}
+                        {!hasChanges && !autoApplied && (
+                          <div className="p-4 bg-green-50 border border-green-400 rounded-lg text-green-800 text-center">
+                            Database is in sync with Excel. No changes needed.
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
-
-                {/* CSV Format Help */}
-                <div className="bg-[#d7e7fd] border-2 border-[#74a9de] rounded-lg p-4 mt-6">
-                  <h3 className="font-medium text-[#000000] mb-2">Required CSV Columns:</h3>
-                  <ul className="text-sm text-[#000000] space-y-1">
-                    <li>• <strong>publicCompanyName</strong> - Business name</li>
-                    <li>• <strong>publicCompanyPhone</strong> - Phone number</li>
-                    <li>• <strong>logoShareUrl</strong> - Google Drive logo link</li>
-                    <li>• <strong>contactFirstName</strong> - Contact name</li>
-                    <li>• <strong>publicWebAddress</strong> - Website (optional)</li>
-                    <li>• <strong>dealerNo</strong> - Dealer number (optional)</li>
-                    <li>• <strong>contactEmail</strong> - Email (optional)</li>
-                  </ul>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Render Management */}
+          {/* Right Column: Batch Render */}
           <div>
             <div className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden">
               <div className="bg-[#c87a3e] px-6 py-4 border-b-2 border-[#000000]">
-                <h2 className="text-xl font-bold text-white">Batch Render</h2>
-                <p className="text-sm text-white mt-1">Start video rendering for all dealers</p>
+                <h2 className="text-xl font-bold text-white">Batch Video Render</h2>
+                <p className="text-sm text-white/90 mt-1">Render videos via Creatomate</p>
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Post Number */}
-                <div>
-                  <label className="block text-sm font-medium text-[#000000] mb-2">
-                    Post Number
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full p-3 border-2 border-[#5378a8] rounded-lg focus:border-[#c87a3e] focus:ring-2 focus:ring-[#c87a3e] outline-none"
-                    value={postNumber}
-                    onChange={(e) => setPostNumber(e.target.value)}
-                    placeholder="700"
-                  />
-                  <p className="text-sm text-[#5378a8] mt-1">
-                    The post number for this batch (e.g., 700, 701)
-                  </p>
-                </div>
+                {/* Batch Inputs - Multiple rows */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Post Number &amp; Template ID
+                    </label>
+                    <button
+                      onClick={handleAddBatch}
+                      className="text-sm px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+                    >
+                      + Add Row
+                    </button>
+                  </div>
 
-                {/* Template ID */}
-                <div>
-                  <label className="block text-sm font-medium text-[#000000] mb-2">
-                    Creatomate Template ID
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full p-3 border-2 border-[#5378a8] rounded-lg font-mono text-sm focus:border-[#c87a3e] focus:ring-2 focus:ring-[#c87a3e] outline-none"
-                    value={templateId}
-                    onChange={(e) => setTemplateId(e.target.value)}
-                    placeholder="603f269d-8019-40b9-8cc5-b4e1829b05bd"
-                  />
-                  <p className="text-sm text-[#5378a8] mt-1">
-                    From your Creatomate template URL
-                  </p>
+                  {batchInputs.map((batch, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        className="w-24 p-2 border-2 border-gray-300 rounded-lg focus:border-[#5378a8] focus:ring-2 focus:ring-[#5378a8]/20 outline-none text-sm"
+                        value={batch.postNumber}
+                        onChange={(e) => handleBatchChange(index, 'postNumber', e.target.value)}
+                        placeholder="Post #"
+                      />
+                      <input
+                        type="text"
+                        className="flex-1 p-2 border-2 border-gray-300 rounded-lg font-mono text-xs focus:border-[#5378a8] focus:ring-2 focus:ring-[#5378a8]/20 outline-none"
+                        value={batch.templateId}
+                        onChange={(e) => handleBatchChange(index, 'templateId', e.target.value)}
+                        placeholder="Creatomate Template ID"
+                      />
+                      {batchInputs.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveBatch(index)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Render Button */}
                 <button
                   onClick={handleStartRender}
-                  disabled={rendering || !postNumber || !templateId}
-                  className="w-full px-6 py-3 bg-[#c87a3e] text-white rounded-lg hover:bg-[#b36a35] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold text-lg transition-colors border-2 border-[#000000]"
+                  disabled={rendering || batchInputs.every(b => !b.postNumber || !b.templateId)}
+                  className="w-full px-6 py-3 bg-[#c87a3e] text-white rounded-lg hover:bg-[#b36a35] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
                 >
-                  {rendering ? 'Starting Render...' : 'Start Batch Render'}
+                  {rendering ? 'Starting Render...' : `Start Batch Render (${batchInputs.filter(b => b.postNumber && b.templateId).length} post${batchInputs.filter(b => b.postNumber && b.templateId).length !== 1 ? 's' : ''})`}
                 </button>
 
                 {/* Render Result */}
                 {renderResult && (
                   <div
-                    className={`p-4 rounded-lg border-2 ${
+                    className={`p-4 rounded-lg ${
                       renderResult.error
-                        ? 'bg-red-50 border-red-500'
-                        : 'bg-green-50 border-green-500'
+                        ? 'bg-red-50 border border-red-500 text-red-800'
+                        : 'bg-green-50 border border-green-500 text-green-800'
                     }`}
                   >
                     {renderResult.error ? (
                       <>
-                        <p className="font-medium text-red-900">❌ Error</p>
-                        <p className="text-sm text-red-800 mt-1">{renderResult.error}</p>
+                        <p className="font-medium">Error</p>
+                        <p className="text-sm mt-1">{renderResult.error}</p>
                       </>
                     ) : (
                       <>
-                        <p className="font-medium text-green-900 mb-3">✅ Batch Started!</p>
-                        <div className="text-sm text-green-800 space-y-1">
-                          <p><strong>Batch ID:</strong> <code className="bg-green-100 px-2 py-1 rounded">{renderResult.batchId}</code></p>
-                          <p><strong>Jobs Created:</strong> {renderResult.jobsCreated}</p>
-                          <p><strong>Post Number:</strong> {renderResult.details?.postNumber}</p>
-                          <p className="mt-3">{renderResult.message}</p>
+                        <p className="font-medium mb-2">{renderResult.message}</p>
+                        <p className="text-sm mb-2">Dealers: {renderResult.dealerCount}</p>
+                        <div className="space-y-1">
+                          {renderResult.batches?.map((b: any) => (
+                            <div key={b.postNumber} className="text-sm flex justify-between items-center bg-green-100 px-2 py-1 rounded">
+                              <span>Post {b.postNumber}</span>
+                              <span className={b.status === 'queued' ? 'text-green-700' : 'text-yellow-700'}>
+                                {b.status === 'queued' ? `${b.jobsCreated} jobs` : b.status}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </>
                     )}
@@ -441,67 +558,195 @@ export default function CreativeAdminPage() {
                 )}
 
                 {/* Batch Status */}
-                {batchId && (
-                  <div className="border-2 border-[#5378a8] rounded-lg p-4 bg-[#d7e7fd]">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-[#000000]">Batch Status</h3>
+                {batchIds.length > 0 && (
+                  <div className="border border-[#5378a8] rounded-lg p-4 bg-[#d7e7fd]">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-gray-900">Status ({batchIds.length} batch{batchIds.length !== 1 ? 'es' : ''})</h3>
                       <button
                         onClick={handleCheckStatus}
-                        className="px-4 py-2 bg-[#5378a8] text-white rounded hover:bg-[#4a6890] font-medium"
+                        className="px-3 py-1 bg-[#5378a8] text-white rounded text-sm hover:bg-[#4a6890]"
                       >
-                        Refresh Status
+                        Refresh
                       </button>
                     </div>
 
-                    {batchStatus && !batchStatus.error && (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de]">
-                            <p className="text-sm font-medium text-[#000000]">Status</p>
-                            <p className="text-lg font-semibold text-[#c87a3e] capitalize">{batchStatus.status}</p>
+                    <div className="space-y-3">
+                      {batchIds.map((batchId) => {
+                        const status = batchStatuses[batchId];
+                        return (
+                          <div key={batchId} className="bg-white rounded-lg p-3">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-medium text-gray-900">Post {status?.postNumber || '...'}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                status?.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                status?.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {status?.status || 'loading'}
+                              </span>
+                            </div>
+                            {status && !status.error && status.progress && (
+                              <div className="grid grid-cols-4 gap-2">
+                                <div className="text-center">
+                                  <p className="text-lg font-bold text-[#5378a8]">{status.progress.total}</p>
+                                  <p className="text-xs text-gray-500">Total</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-lg font-bold text-green-600">{status.progress.completed}</p>
+                                  <p className="text-xs text-gray-500">Done</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-lg font-bold text-yellow-600">{status.progress.pending + status.progress.processing}</p>
+                                  <p className="text-xs text-gray-500">Pending</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-lg font-bold text-red-600">{status.progress.failed}</p>
+                                  <p className="text-xs text-gray-500">Failed</p>
+                                </div>
+                              </div>
+                            )}
+                            {status?.error && (
+                              <p className="text-sm text-red-600">{status.error}</p>
+                            )}
                           </div>
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de]">
-                            <p className="text-sm font-medium text-[#000000]">Progress</p>
-                            <p className="text-lg font-semibold text-[#c87a3e]">{batchStatus.progress?.percentComplete}%</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-2">
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de] text-center">
-                            <p className="text-2xl font-bold text-[#5378a8]">{batchStatus.progress?.total}</p>
-                            <p className="text-xs text-[#000000]">Total</p>
-                          </div>
-                          <div className="bg-white p-3 rounded border-2 border-green-500 text-center">
-                            <p className="text-2xl font-bold text-green-600">{batchStatus.progress?.completed}</p>
-                            <p className="text-xs text-green-800">Done</p>
-                          </div>
-                          <div className="bg-white p-3 rounded border-2 border-yellow-500 text-center">
-                            <p className="text-2xl font-bold text-yellow-600">{batchStatus.progress?.pending + batchStatus.progress?.processing}</p>
-                            <p className="text-xs text-yellow-800">Progress</p>
-                          </div>
-                          <div className="bg-white p-3 rounded border-2 border-red-500 text-center">
-                            <p className="text-2xl font-bold text-red-600">{batchStatus.progress?.failed}</p>
-                            <p className="text-xs text-red-800">Failed</p>
-                          </div>
-                        </div>
-
-                        {batchStatus.recentCompletions && batchStatus.recentCompletions.length > 0 && (
-                          <div className="bg-white p-3 rounded border-2 border-[#74a9de]">
-                            <p className="font-medium text-[#000000] mb-2">Recent Completions:</p>
-                            <ul className="text-sm space-y-1">
-                              {batchStatus.recentCompletions.map((completion: any, i: number) => (
-                                <li key={i} className="text-[#000000]">
-                                  ✅ {completion.businessName} - <a href={completion.driveUrl} target="_blank" rel="noopener noreferrer" className="text-[#5378a8] hover:underline">View</a>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="mt-6 grid grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
+            <p className="text-3xl font-bold text-[#5378a8]">124</p>
+            <p className="text-sm text-gray-600">FULL Dealers</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
+            <p className="text-3xl font-bold text-[#c87a3e]">656+</p>
+            <p className="text-sm text-gray-600">Posts in Archive</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
+            <p className="text-3xl font-bold text-green-600">100%</p>
+            <p className="text-sm text-gray-600">Ready for Automation</p>
+          </div>
+        </div>
+
+        {/* Process Done Status Section */}
+        <div className="mt-6">
+          <div className="bg-white border-2 border-green-500 rounded-lg shadow-lg overflow-hidden">
+            <div className="bg-green-500 px-6 py-4 border-b-2 border-green-600">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Process Scheduled Emails</h2>
+                  <p className="text-sm text-white/90 mt-1">
+                    Send emails to dealers with &quot;Done&quot; status in the scheduling spreadsheet
+                  </p>
+                </div>
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                >
+                  Open Spreadsheet
+                </a>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Action buttons */}
+              <div className="flex gap-3 mb-4">
+                <button
+                  onClick={fetchDoneDealers}
+                  disabled={loadingDone}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 font-medium transition-colors"
+                >
+                  {loadingDone ? 'Checking...' : 'Refresh'}
+                </button>
+                {doneDealers.length > 0 && (
+                  <button
+                    onClick={handleProcessAll}
+                    disabled={processingDealer !== null}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 font-medium transition-colors"
+                  >
+                    Process All ({doneDealers.length})
+                  </button>
+                )}
+              </div>
+
+              {/* Status */}
+              {loadingDone ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+                  Checking spreadsheet...
+                </div>
+              ) : doneDealers.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-medium">No dealers with &quot;Done&quot; status</p>
+                  <p className="text-sm mt-1">When Olivia marks dealers as &quot;Done&quot; in the spreadsheet, they&apos;ll appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {doneDealers.map((dealer) => {
+                    const result = processResults[dealer.dealer_no];
+                    const isProcessing = processingDealer === dealer.dealer_no;
+
+                    return (
+                      <div
+                        key={dealer.dealer_no}
+                        className={`flex items-center justify-between p-4 rounded-lg border ${
+                          result?.success
+                            ? 'bg-green-50 border-green-300'
+                            : result?.error
+                            ? 'bg-red-50 border-red-300'
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-sm text-gray-500">#{dealer.dealer_no}</span>
+                            <span className="font-medium text-gray-900">{dealer.first_name}</span>
+                            <span className="text-gray-400">|</span>
+                            <span className="text-sm text-gray-600">{dealer.email}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                dealer.email_type === 'first_post'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-purple-100 text-purple-700'
+                              }`}
+                            >
+                              {dealer.email_type === 'first_post' ? 'First Post' : 'Post Scheduled'}
+                            </span>
+                            <span className="text-xs text-gray-400">Column {dealer.col_letter}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {result?.success ? (
+                            <span className="text-green-600 font-medium">Sent!</span>
+                          ) : result?.error ? (
+                            <span className="text-red-600 text-sm">{result.error}</span>
+                          ) : (
+                            <button
+                              onClick={() => handleProcessDealer(dealer)}
+                              disabled={isProcessing || processingDealer !== null}
+                              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 font-medium transition-colors text-sm"
+                            >
+                              {isProcessing ? 'Sending...' : 'Send Email'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

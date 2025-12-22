@@ -1,133 +1,169 @@
 // app/api/creative/render-batch/route.ts
-// API endpoint to start a batch render for all active dealers
+// API endpoint to start batch renders for all FULL dealers from SQLite
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import Database from 'better-sqlite3';
+import path from 'path';
 import {
   createRenderBatch,
   createRenderJob,
   isBatchProcessing,
 } from '@/lib/renderQueue';
-import type { CreateRenderBatchRequest } from '@/lib/types/renderQueue';
+
+const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+
+interface RenderRequest {
+  postNumber: number;
+  templateId: string;
+}
+
+interface Dealer {
+  dealer_no: string;
+  display_name: string;
+  creatomate_phone: string;
+  creatomate_website: string;
+  creatomate_logo: string;
+}
 
 /**
  * POST /api/creative/render-batch
  *
- * Start a batch render for all active dealers
+ * Start batch renders for all FULL dealers from SQLite
  *
- * Request body:
+ * Request body (single):
  * {
  *   postNumber: 700,
- *   templateId: "603f269d-8019-40b9-8cc5-b4e1829b05bd",
- *   baseVideoUrl?: "https://..." (optional)
+ *   templateId: "603f269d-8019-40b9-8cc5-b4e1829b05bd"
+ * }
+ *
+ * Request body (multiple):
+ * {
+ *   batches: [
+ *     { postNumber: 666, templateId: "abc123" },
+ *     { postNumber: 667, templateId: "def456" },
+ *     { postNumber: 668, templateId: "ghi789" }
+ *   ]
  * }
  */
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateRenderBatchRequest = await request.json();
-    const { postNumber, templateId, baseVideoUrl } = body;
+    const body = await request.json();
 
-    // Validate required fields
-    if (!postNumber || !templateId) {
+    // Support both single and multiple batch formats
+    let renderRequests: RenderRequest[] = [];
+
+    if (body.batches && Array.isArray(body.batches)) {
+      // Multiple batches format
+      renderRequests = body.batches;
+    } else if (body.postNumber && body.templateId) {
+      // Single batch format (backwards compatible)
+      renderRequests = [{ postNumber: body.postNumber, templateId: body.templateId }];
+    } else {
       return NextResponse.json(
-        { error: 'Missing required fields: postNumber, templateId' },
+        { error: 'Missing required fields: postNumber and templateId, or batches array' },
         { status: 400 }
       );
     }
 
-    // Check if a batch is already processing for this post number
-    const alreadyProcessing = await isBatchProcessing(postNumber);
-    if (alreadyProcessing) {
-      return NextResponse.json(
-        {
-          error: `Batch for post ${postNumber} is already processing`,
-          message: 'Please wait for the current batch to complete',
-        },
-        { status: 409 }
-      );
-    }
-
-    // Get all ACTIVE businesses from Firestore
-    const businessesSnapshot = await db
-      .collection('businesses')
-      .where('status', '==', 'ACTIVE')
-      .get();
-
-    if (businessesSnapshot.empty) {
-      return NextResponse.json(
-        { error: 'No active businesses found' },
-        { status: 400 }
-      );
-    }
-
-    const businesses = businessesSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as { businessName?: string; phone?: string; logoUrl?: string }),
-    }));
-
-    // Validate that all businesses have required fields
-    const validBusinesses = businesses.filter((b: any) => {
-      const hasRequired = b.businessName && b.phone && b.logoUrl;
-      if (!hasRequired) {
-        console.warn(
-          `Skipping business ${b.id}: missing required fields (name: ${b.businessName}, phone: ${b.phone}, logo: ${!!b.logoUrl})`
+    // Validate all requests
+    for (const req of renderRequests) {
+      if (!req.postNumber || !req.templateId) {
+        return NextResponse.json(
+          { error: `Invalid batch: missing postNumber or templateId` },
+          { status: 400 }
         );
       }
-      return hasRequired;
-    });
+    }
 
-    if (validBusinesses.length === 0) {
+    // Get all FULL dealers from SQLite with complete creatomate data
+    const db = new Database(DB_PATH, { readonly: true });
+    const dealers = db.prepare(`
+      SELECT dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo
+      FROM dealers
+      WHERE program_status = 'FULL'
+        AND ready_for_automate = 'yes'
+        AND creatomate_logo IS NOT NULL
+        AND creatomate_logo != ''
+        AND display_name IS NOT NULL
+        AND display_name != ''
+    `).all() as Dealer[];
+    db.close();
+
+    if (dealers.length === 0) {
       return NextResponse.json(
-        {
-          error: 'No businesses with complete data found',
-          message: 'All businesses are missing required fields (name, phone, or logo)',
-        },
+        { error: 'No FULL dealers with complete data found' },
         { status: 400 }
       );
     }
 
-    // Create render batch
-    const batchId = await createRenderBatch({
-      postNumber,
-      templateId,
-      totalJobs: validBusinesses.length,
-      createdBy: 'greg@woodhouseagency.com', // TODO: Get from auth when implemented
-      baseVideoUrl,
-    });
+    console.log(`Found ${dealers.length} FULL dealers ready for rendering`);
 
-    // Create render jobs for each business
-    const jobIds: string[] = [];
-    for (const business of validBusinesses) {
-      const jobId = await createRenderJob({
-        batchId,
-        businessId: business.id,
-        businessName: business.businessName!, // Safe: filtered above
-        postNumber,
-        templateId,
+    // Process each batch request
+    const results: Array<{
+      postNumber: number;
+      templateId: string;
+      batchId: string;
+      jobsCreated: number;
+      status: string;
+    }> = [];
+
+    for (const req of renderRequests) {
+      // Check if batch already processing
+      const alreadyProcessing = await isBatchProcessing(req.postNumber);
+      if (alreadyProcessing) {
+        results.push({
+          postNumber: req.postNumber,
+          templateId: req.templateId,
+          batchId: '',
+          jobsCreated: 0,
+          status: `Skipped: Post ${req.postNumber} already processing`,
+        });
+        continue;
+      }
+
+      // Create render batch in Firestore
+      const batchId = await createRenderBatch({
+        postNumber: req.postNumber,
+        templateId: req.templateId,
+        totalJobs: dealers.length,
+        createdBy: 'greg@woodhouseagency.com',
       });
-      jobIds.push(jobId);
+
+      // Create render jobs for each dealer
+      for (const dealer of dealers) {
+        await createRenderJob({
+          batchId,
+          businessId: dealer.dealer_no,
+          businessName: dealer.display_name,
+          postNumber: req.postNumber,
+          templateId: req.templateId,
+        });
+      }
+
+      results.push({
+        postNumber: req.postNumber,
+        templateId: req.templateId,
+        batchId,
+        jobsCreated: dealers.length,
+        status: 'queued',
+      });
+
+      console.log(`Created batch ${batchId} for Post ${req.postNumber} with ${dealers.length} jobs`);
     }
 
-    // Estimate completion time
-    // With 10 renders/minute and ~2-5 min render time, estimate 15-20 minutes total
-    const estimatedMinutes = Math.ceil(validBusinesses.length / 10) + 15;
+    // Calculate estimates
+    const totalJobs = results.reduce((sum, r) => sum + r.jobsCreated, 0);
+    const estimatedMinutes = Math.ceil(totalJobs / 10) + 15;
     const estimatedCompletionTime = new Date(
       Date.now() + estimatedMinutes * 60 * 1000
     ).toISOString();
 
     return NextResponse.json({
       status: 'success',
-      batchId,
-      jobsCreated: validBusinesses.length,
-      skippedBusinesses: businesses.length - validBusinesses.length,
+      message: `${results.length} batch(es) queued with ${totalJobs} total jobs`,
+      dealerCount: dealers.length,
+      batches: results,
       estimatedCompletionTime,
-      message: `Batch queued successfully. ${validBusinesses.length} videos will be rendered. You'll receive an email when complete.`,
-      details: {
-        postNumber,
-        templateId,
-        totalBusinesses: businesses.length,
-        validBusinesses: validBusinesses.length,
-      },
     });
   } catch (error) {
     console.error('Error creating render batch:', error);

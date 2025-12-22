@@ -5,7 +5,7 @@ import path from 'path';
 import * as cheerio from 'cheerio';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
-const BRANDFETCH_CLIENT_ID = process.env.BRANDFETCH_CLIENT_ID;
+const BRANDFETCH_API_KEY = process.env.BRANDFETCH_API_KEY;
 
 // Fallback dimensions to filter out
 const BRANDFETCH_FALLBACKS = [[820, 877], [820, 220]];
@@ -165,23 +165,34 @@ async function scrapeWebsiteLogos(domain: string): Promise<string[]> {
 }
 
 export async function GET(request: NextRequest) {
+  // Accept either a direct website URL or dealerNo to look up
+  const websiteParam = request.nextUrl.searchParams.get('website');
   const dealerNo = request.nextUrl.searchParams.get('dealerNo');
 
-  if (!dealerNo) {
-    return NextResponse.json({ error: 'Missing dealerNo' }, { status: 400 });
+  let websiteUrl: string | null = null;
+
+  // If website is provided directly, use it
+  if (websiteParam) {
+    websiteUrl = websiteParam;
+  }
+  // Otherwise look up by dealerNo
+  else if (dealerNo) {
+    try {
+      const db = new Database(DB_PATH, { readonly: true });
+      const dealer = db.prepare('SELECT creatomate_website, dealer_web_address FROM dealers WHERE dealer_no = ?').get(dealerNo) as { creatomate_website: string; dealer_web_address: string } | undefined;
+      db.close();
+      websiteUrl = dealer?.creatomate_website || dealer?.dealer_web_address || null;
+    } catch {
+      return NextResponse.json({ error: 'Database error', logos: [] }, { status: 500 });
+    }
+  }
+
+  if (!websiteUrl) {
+    return NextResponse.json({ error: 'Missing website or dealerNo parameter', logos: [] }, { status: 400 });
   }
 
   try {
-    // Get dealer website
-    const db = new Database(DB_PATH, { readonly: true });
-    const dealer = db.prepare('SELECT creatomate_website FROM dealers WHERE dealer_no = ?').get(dealerNo) as { creatomate_website: string } | undefined;
-    db.close();
-
-    if (!dealer?.creatomate_website) {
-      return NextResponse.json({ error: 'No website found', logos: [] });
-    }
-
-    const domain = cleanDomain(dealer.creatomate_website);
+    const domain = cleanDomain(websiteUrl);
     if (!domain) {
       return NextResponse.json({ error: 'Invalid website', logos: [] });
     }
@@ -190,11 +201,11 @@ export async function GET(request: NextRequest) {
     const seen = new Set<string>();
 
     // 1. Brandfetch
-    if (BRANDFETCH_CLIENT_ID) {
+    if (BRANDFETCH_API_KEY) {
       const bfUrls = [
-        `https://cdn.brandfetch.io/${domain}?c=${BRANDFETCH_CLIENT_ID}`,
-        `https://cdn.brandfetch.io/${domain}/icon?c=${BRANDFETCH_CLIENT_ID}`,
-        `https://cdn.brandfetch.io/${domain}/logo?c=${BRANDFETCH_CLIENT_ID}`,
+        `https://cdn.brandfetch.io/${domain}?c=${BRANDFETCH_API_KEY}`,
+        `https://cdn.brandfetch.io/${domain}/icon?c=${BRANDFETCH_API_KEY}`,
+        `https://cdn.brandfetch.io/${domain}/logo?c=${BRANDFETCH_API_KEY}`,
       ];
 
       for (const url of bfUrls) {

@@ -1,6 +1,6 @@
 # Woodhouse Creative - Database Documentation
 
-**Last Updated:** December 21, 2025
+**Last Updated:** December 22, 2025
 **Database:** `~/woodhouse_creative/data/sqlite/creative.db`
 
 ---
@@ -209,8 +209,28 @@ CREATE TABLE dealer_contacts (
 | `batch_render.py` | Batch render videos via Creatomate | Uploads to Google Drive |
 | `email_sender/send_email.py` | Send dealer emails via Resend | Auto-updates spreadsheet status |
 | `update_dealer_status.py` | Promote/demote dealers | CONTENT <-> FULL status changes |
-| `gmail_monitor.gs` | Apps Script for Gmail | Monitors FB admin emails |
+| `process_done_status.py` | Process "Done" status dealers | Batch email sending |
+| `add_dealer_to_spreadsheet.py` | Add new dealer column | Populates all metadata rows |
 | `export_full_dealers.py` | Export CSV for Creatomate | All 124 FULL dealers |
+
+### Admin Dashboard Features
+
+The admin dashboard at `/admin` provides:
+- **Process Scheduled Emails**: View dealers with "Done" status, send first_post or post_scheduled emails
+- **Excel Sync**: Preview/apply changes from Allied Excel
+- **Batch Render**: Submit post number + template for video rendering
+
+### API Endpoints for Email
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/process-done` | GET | List dealers with "Done" status |
+| `/api/admin/process-done` | POST | Send email and update status to "Email Sent" |
+
+The POST endpoint:
+1. Calls Python script `scripts/email_sender/send_email.py`
+2. Updates `first_post_email_sent` or `last_post_email_sent` in database
+3. Updates spreadsheet row 2 to "Email Sent"
 
 ---
 

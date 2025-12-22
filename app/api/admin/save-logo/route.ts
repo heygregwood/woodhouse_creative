@@ -1,8 +1,9 @@
-// POST /api/admin/save-logo - Download logo and save to Google Drive
+// POST /api/admin/save-logo - Download logo, convert to PNG, and save to Google Drive
 import { NextRequest, NextResponse } from 'next/server';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { uploadToGoogleDrive } from '@/lib/google-drive';
+import sharp from 'sharp';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
@@ -48,15 +49,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`[SAVE-LOGO] Downloaded ${imageBuffer.length} bytes, type: ${contentType}`);
 
-    // Determine file extension
-    let extension = 'png';
-    if (contentType.includes('jpeg') || contentType.includes('jpg')) extension = 'jpg';
-    else if (contentType.includes('webp')) extension = 'webp';
-    else if (contentType.includes('gif')) extension = 'gif';
-    else if (contentType.includes('svg')) extension = 'svg';
+    // Convert to PNG using sharp
+    let pngBuffer: Buffer;
+    try {
+      pngBuffer = await sharp(imageBuffer)
+        .png()
+        .toBuffer();
+      console.log(`[SAVE-LOGO] Converted to PNG: ${pngBuffer.length} bytes`);
+    } catch (conversionError) {
+      console.error(`[SAVE-LOGO] Conversion failed, using original:`, conversionError);
+      // If conversion fails (e.g., SVG), try to use original
+      pngBuffer = imageBuffer;
+    }
 
-    // Create filename from display name (matches Creatomate Company Name)
-    const filename = `${sanitizeFilename(displayName)}.${extension}`;
+    // Create filename from display name (always .png now)
+    const filename = `${sanitizeFilename(displayName)}.png`;
 
     console.log(`[SAVE-LOGO] Uploading as: ${filename}`);
 
@@ -64,8 +71,8 @@ export async function POST(request: NextRequest) {
     const uploadResult = await uploadToGoogleDrive({
       fileName: filename,
       folderPath: LOGOS_FOLDER_PATH,
-      buffer: imageBuffer,
-      mimeType: contentType,
+      buffer: pngBuffer,
+      mimeType: 'image/png',
     });
 
     console.log(`[SAVE-LOGO] Uploaded to Drive: ${uploadResult.webViewLink}`);

@@ -1,7 +1,7 @@
 # Woodhouse Creative Automation - End to End Documentation
 
-> **Status:** DRAFT  
-> **Last Updated:** December 19, 2025  
+> **Status:** ACTIVE
+> **Last Updated:** December 22, 2025
 > **Author:** Greg Wood / Claude  
 
 ---
@@ -198,33 +198,58 @@ Returns dealer status maintained by Woodhouse.
 **Status:** Implemented December 2025
 
 **Components:**
-1. **Resend API Integration** (`/scripts/email/send_email.py`)
+1. **Resend API Integration** (`/scripts/email_sender/send_email.py`)
    - Account: communitymanagers@woodhouseagency.com
-   - Domain: woodhouseagency.com
+   - Domain: woodhouseagency.com (verified)
    - Welcome Email → on new dealer
+   - FB Admin Accepted → after accepting FB admin invite
    - First Post Scheduled → on first FULL posting
    - Post Scheduled → on ongoing posts
    - Content Ready → for CONTENT dealers (monthly download)
+   - Holiday → seasonal campaigns
 
 2. **Email Templates** (`/templates/emails/`)
    - `welcome.html` - Welcome to Turnkey Social Media Program
+   - `fb_admin_accepted.html` - We're Now Managing Your Facebook Page
    - `first_post_scheduled.html` - Your Social Media Posts Are Now Scheduled!
    - `post_scheduled.html` - Your Latest Social Media Content Has Been Scheduled
    - `content_ready.html` - Social Media Content is Ready to Download
+   - `holiday.html` - Seasonal holiday emails
+
+3. **Dashboard Integration** (`/admin` page)
+   - "Process Scheduled Emails" section shows dealers with "Done" status
+   - One-click send for individual dealers
+   - "Process All" button for batch sending
+   - Automatically determines first_post vs post_scheduled based on `first_post_email_sent` field
+
+4. **API Endpoint** (`/api/admin/process-done`)
+   - GET: List dealers with "Done" status from scheduling spreadsheet
+   - POST: Send email, update database, update spreadsheet to "Email Sent"
 
 **Usage:**
 ```bash
-# Send welcome email
-python3 scripts/email/send_email.py welcome 10122026
+# Send emails via CLI
+python3 scripts/email_sender/send_email.py welcome 10122026
+python3 scripts/email_sender/send_email.py first_post 10122026
+python3 scripts/email_sender/send_email.py post_scheduled 10122026
+python3 scripts/email_sender/send_email.py fb_admin_accepted 10122026
 
 # Dry run (test without sending)
-python3 scripts/email/send_email.py welcome 10122026 --dry-run
+python3 scripts/email_sender/send_email.py welcome 10122026 --dry-run
+
+# Process "Done" status dealers
+python3 scripts/process_done_status.py
+python3 scripts/process_done_status.py --dry-run
+
+# Or use dashboard at /admin → "Process Scheduled Emails"
 ```
 
 **Benefits:**
 - No manual Mail Merge runs
 - Consistent timing
 - Trackable (open/click rates via Resend dashboard)
+- Dashboard provides visibility into pending emails
+- Automatically tracks first_post vs ongoing emails
 
 ### Phase 3: Creatomate CSV Auto-Generation (Priority: MEDIUM)
 
@@ -368,11 +393,50 @@ Allied Air API
 
 | Script | Purpose | Status |
 |--------|---------|--------|
-| `scripts/email/send_email.py` | Send triggered emails via Resend | ✅ Ready |
-| `scripts/allied_api.py` | Allied API client | TODO |
-| `scripts/sync_dealers.py` | Sync Allied → DB | TODO |
+| `scripts/email_sender/send_email.py` | Send triggered emails via Resend | ✅ Ready |
+| `scripts/process_done_status.py` | Process "Done" status dealers | ✅ Ready |
+| `scripts/add_dealer_to_spreadsheet.py` | Add new dealer column to spreadsheet | ✅ Ready |
+| `scripts/sync_spreadsheet.py` | Sync dealer data to Google Sheets | ✅ Ready |
+| `scripts/batch_render.py` | Batch render videos via Creatomate | ✅ Ready |
+| `scripts/update_dealer_status.py` | Promote/demote dealers | ✅ Ready |
+| `scripts/sync_from_excel.py` | Sync from Allied Excel to SQLite | ✅ Ready |
 | `scripts/export_full_dealers.py` | Generate Creatomate CSV | ✅ Ready |
-| `scripts/fetch_logos.py` | Brandfetch/scrape logos | ✅ Ready |
+| `scripts/verify_logos.py` | Validate logo URLs | ✅ Ready |
+| `scripts/crawl_websites.py` | Scrape dealer websites for contacts | ✅ Ready |
+| `scripts/allied_api.py` | Allied API client | TODO (waiting on credentials) |
+
+## API Routes Reference
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/admin/process-done` | GET/POST | List/process "Done" status dealers |
+| `/api/admin/dealers` | GET | Fetch dealers with filters |
+| `/api/admin/sync-excel` | GET/POST | Preview/apply Excel sync |
+| `/api/admin/dealer-status` | POST | Update CONTENT ↔ FULL status |
+| `/api/admin/save-logo-staging` | POST | Save logo (converts to PNG) |
+| `/api/creative/render-batch` | POST/GET | Start/monitor batch renders |
+| `/api/cron/process-render-queue` | GET | Process pending render jobs |
+| `/api/webhooks/creatomate` | POST | Receive render completion |
+
+## Google Apps Scripts (External)
+
+These run on Google's servers at https://script.google.com:
+
+### 1. New Dealer Welcome Email
+**Account:** communitymanagers@woodhouseagency.com
+**Name:** "New Dealer Welcome Email"
+**Purpose:** Receives webhook from Excel VBA, adds row for Mail Merge auto-send
+
+```javascript
+// doPost(e) receives JSON with dealer data
+// Appends to Sheet1 with ScheduledDate = now()
+// Mail Merge addon auto-sends when row appears
+```
+
+### 2. Process Done Status (Deprecated)
+**Location:** `scripts/google_apps_script/process_done_status.gs`
+**Status:** Replaced by dashboard button at `/admin`
+**Note:** Was planned as hourly automation but dashboard trigger is preferred
 
 ---
 
@@ -403,3 +467,7 @@ Allied Air API
 | 2024-12-19 | Initial draft created | Claude |
 | 2024-12-19 | Added API specs and automation roadmap | Claude |
 | 2025-12-19 | Email automation complete (Resend integration) | Claude |
+| 2025-12-21 | Post 666 batch render complete (124/124 videos) | Greg/Claude |
+| 2025-12-22 | Dashboard "Process Done" feature added | Claude |
+| 2025-12-22 | Logo staging PNG conversion added | Claude |
+| 2025-12-22 | Full codebase documentation update | Claude |

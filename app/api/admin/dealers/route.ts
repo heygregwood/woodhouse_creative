@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const db = new Database(DB_PATH, { readonly: true });
 
     let query = `
-      SELECT dealer_no, display_name, creatomate_website, creatomate_logo, ready_for_automate
+      SELECT dealer_no, display_name, creatomate_website, creatomate_logo, creatomate_phone, ready_for_automate, logo_source
       FROM dealers
       WHERE program_status = 'FULL'
     `;
@@ -21,6 +21,9 @@ export async function GET(request: NextRequest) {
       query += ` AND (ready_for_automate IS NULL OR ready_for_automate != 'yes')`;
     } else if (filter === 'no-logo') {
       query += ` AND (creatomate_logo IS NULL OR creatomate_logo = '')`;
+    } else if (filter === 'round2') {
+      // Show dealers with logos updated today (the ones from Round 2 that got new selections)
+      query += ` AND logo_source IN ('brandfetch', 'website', 'favicon') AND updated_at > datetime('now', '-1 day')`;
     }
 
     query += ` ORDER BY display_name`;

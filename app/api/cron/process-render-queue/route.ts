@@ -2,7 +2,8 @@
 // Cron job to process pending render jobs from the queue
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import Database from 'better-sqlite3';
+import path from 'path';
 import {
   getPendingRenderJobs,
   updateRenderJob,
@@ -10,6 +11,8 @@ import {
 } from '@/lib/renderQueue';
 import { createRender } from '@/lib/creatomate';
 import { Timestamp } from 'firebase-admin/firestore';
+
+const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 /**
  * GET /api/cron/process-render-queue
@@ -69,19 +72,29 @@ export async function GET(request: NextRequest) {
       try {
         results.processed++;
 
-        // Get business data
-        const businessDoc = await db.collection('businesses').doc(job.businessId).get();
+        // Get dealer data from SQLite
+        const db = new Database(DB_PATH, { readonly: true });
+        const dealer = db.prepare(`
+          SELECT dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo
+          FROM dealers
+          WHERE dealer_no = ?
+        `).get(job.businessId) as {
+          dealer_no: string;
+          display_name: string;
+          creatomate_phone: string;
+          creatomate_website: string;
+          creatomate_logo: string;
+        } | undefined;
+        db.close();
 
-        if (!businessDoc.exists) {
-          throw new Error(`Business not found: ${job.businessId}`);
+        if (!dealer) {
+          throw new Error(`Dealer not found: ${job.businessId}`);
         }
 
-        const business = businessDoc.data();
-
         // Validate required fields
-        if (!business?.businessName || !business?.phone || !business?.logoUrl) {
+        if (!dealer.display_name || !dealer.creatomate_phone || !dealer.creatomate_logo) {
           throw new Error(
-            `Business ${job.businessId} missing required fields (name: ${business?.businessName}, phone: ${business?.phone}, logo: ${!!business?.logoUrl})`
+            `Dealer ${job.businessId} missing required fields (name: ${dealer.display_name}, phone: ${dealer.creatomate_phone}, logo: ${!!dealer.creatomate_logo})`
           );
         }
 
@@ -95,10 +108,10 @@ export async function GET(request: NextRequest) {
         const { renderId, status } = await createRender({
           templateId: job.templateId,
           businessData: {
-            businessName: business.businessName,
-            phone: business.phone,
-            logoUrl: business.logoUrl,
-            website: business.website,
+            businessName: dealer.display_name,
+            phone: dealer.creatomate_phone,
+            logoUrl: dealer.creatomate_logo,
+            website: dealer.creatomate_website,
           },
           metadata: {
             jobId: job.id,
@@ -117,7 +130,7 @@ export async function GET(request: NextRequest) {
         await updateBatchProgress(job.batchId);
 
         results.succeeded++;
-        console.log(`✅ Started render for ${business.businessName} (renderId: ${renderId})`);
+        console.log(`✅ Started render for ${dealer.display_name} (renderId: ${renderId})`);
 
         // Rate limit: Wait 350ms between API calls
         // This gives us ~10 renders/minute, well under the 30 req/10s limit

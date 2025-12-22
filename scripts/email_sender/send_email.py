@@ -301,12 +301,14 @@ def send_welcome_email(dealer_no: str) -> Dict[str, Any]:
     )
 
 
-def send_fb_admin_accepted_email(dealer_no: str) -> Dict[str, Any]:
+def send_fb_admin_accepted_email(dealer_no: str, update_spreadsheet: bool = True) -> Dict[str, Any]:
     """
     Send FB Admin Accepted Email
     Trigger: When we accept a dealer's Facebook admin invite (CONTENT -> FULL)
 
-    This is a manual email - not auto-sent by the system.
+    Args:
+        dealer_no: Dealer number
+        update_spreadsheet: If True, update spreadsheet status to 'Email Sent'
     """
     dealer = get_dealer(dealer_no)
     if not dealer:
@@ -324,11 +326,17 @@ def send_fb_admin_accepted_email(dealer_no: str) -> Dict[str, Any]:
 
     subject = "Welcome - We're Now Managing Your Facebook Page"
 
-    return send_email(
+    result = send_email(
         to_email=dealer['contact_email'],
         subject=subject,
         html_body=html_body
     )
+
+    # Update spreadsheet if email was sent successfully
+    if result.get('success') and update_spreadsheet:
+        update_email_status(dealer_no, 'Email Sent')
+
+    return result
 
 
 def send_first_post_scheduled_email(dealer_no: str, update_spreadsheet: bool = True) -> Dict[str, Any]:
@@ -473,7 +481,7 @@ if __name__ == '__main__':
     if args.action == 'welcome':
         result = send_welcome_email(args.dealer_no)
     elif args.action == 'fb_admin_accepted':
-        result = send_fb_admin_accepted_email(args.dealer_no)
+        result = send_fb_admin_accepted_email(args.dealer_no, update_spreadsheet=update_sheet)
     elif args.action == 'first_post':
         result = send_first_post_scheduled_email(args.dealer_no, update_spreadsheet=update_sheet)
     elif args.action == 'post_scheduled':

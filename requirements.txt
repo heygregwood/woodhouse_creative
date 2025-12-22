@@ -1,0 +1,11 @@
+# Python dependencies for Woodhouse Creative Automation scripts
+# Install: pip install -r requirements.txt
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTTP requests (for Resend API)
+requests>=2.31.0
+
+# Database
+# sqlite3 is built into Python, no install needed
