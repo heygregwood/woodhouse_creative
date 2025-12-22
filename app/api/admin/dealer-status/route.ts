@@ -1,0 +1,327 @@
+/**
+ * POST /api/admin/dealer-status
+ *
+ * Update dealer program status based on Facebook admin access changes.
+ * Called by Google Apps Script when FB admin invite/removal emails arrive.
+ *
+ * Body:
+ *   action: 'promote' | 'demote'
+ *   dealer_name: string (from email subject)
+ *   source: 'gmail_webhook' | 'manual' (optional)
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import Database from 'better-sqlite3';
+import path from 'path';
+import { google } from 'googleapis';
+
+const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
+const DEALERS_FOLDER_ID = '1QwyyE9Pq-p8u-TEz7B5nC-14BERpDPmv';
+const COL_DEALERS_START = 6;
+
+// Verify webhook secret (optional but recommended)
+const WEBHOOK_SECRET = process.env.DEALER_STATUS_WEBHOOK_SECRET;
+
+interface Dealer {
+  dealer_no: string;
+  display_name: string;
+  dealer_name: string;
+  program_status: string;
+  contact_first_name: string;
+  contact_email: string;
+  region: string;
+  creatomate_phone: string;
+  creatomate_website: string;
+}
+
+function getGoogleAuth() {
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!serviceAccountEmail || !privateKey) {
+    throw new Error('Missing Google credentials');
+  }
+
+  return new google.auth.GoogleAuth({
+    credentials: {
+      client_email: serviceAccountEmail,
+      private_key: privateKey,
+    },
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive',
+    ],
+  });
+}
+
+function findDealerByName(db: Database.Database, name: string): Dealer | null {
+  // Try exact match first
+  let dealer = db.prepare(`
+    SELECT dealer_no, display_name, dealer_name, program_status,
+           contact_first_name, contact_email, region,
+           creatomate_phone, creatomate_website
+    FROM dealers
+    WHERE LOWER(display_name) = LOWER(?)
+       OR LOWER(dealer_name) = LOWER(?)
+  `).get(name, name) as Dealer | undefined;
+
+  if (!dealer) {
+    // Try partial match
+    dealer = db.prepare(`
+      SELECT dealer_no, display_name, dealer_name, program_status,
+             contact_first_name, contact_email, region,
+             creatomate_phone, creatomate_website
+      FROM dealers
+      WHERE LOWER(display_name) LIKE LOWER(?)
+         OR LOWER(dealer_name) LIKE LOWER(?)
+    `).get(`%${name}%`, `%${name}%`) as Dealer | undefined;
+  }
+
+  return dealer || null;
+}
+
+async function addToSpreadsheet(dealer: Dealer, auth: ReturnType<typeof getGoogleAuth>) {
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  // Read current row 1 to find next column
+  const result = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: 'Sheet1!1:11',
+  });
+
+  const rows = result.data.values || [];
+  if (!rows.length) throw new Error('Spreadsheet is empty');
+
+  const nextCol = rows[0].length;
+  const colLetter = nextCol < 26
+    ? String.fromCharCode(65 + nextCol)
+    : String.fromCharCode(64 + Math.floor(nextCol / 26)) + String.fromCharCode(65 + (nextCol % 26));
+
+  // Prepare data for new column (rows 1-11)
+  const updates = [
+    { range: `Sheet1!${colLetter}1`, values: [[dealer.dealer_no]] },
+    { range: `Sheet1!${colLetter}2`, values: [['Pending']] },
+    { range: `Sheet1!${colLetter}3`, values: [['']] },
+    { range: `Sheet1!${colLetter}4`, values: [['']] },
+    { range: `Sheet1!${colLetter}5`, values: [[dealer.contact_first_name || '']] },
+    { range: `Sheet1!${colLetter}6`, values: [[dealer.contact_email || '']] },
+    { range: `Sheet1!${colLetter}7`, values: [[dealer.region || '']] },
+    { range: `Sheet1!${colLetter}8`, values: [[dealer.creatomate_website || '']] },
+    { range: `Sheet1!${colLetter}9`, values: [[dealer.creatomate_phone || '']] },
+    { range: `Sheet1!${colLetter}10`, values: [[dealer.dealer_name || '']] },
+    { range: `Sheet1!${colLetter}11`, values: [[dealer.display_name || '']] },
+  ];
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: {
+      valueInputOption: 'RAW',
+      data: updates,
+    },
+  });
+
+  return colLetter;
+}
+
+async function removeFromSpreadsheet(dealerNo: string, auth: ReturnType<typeof getGoogleAuth>) {
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  // Read row 1 to find dealer column
+  const result = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: 'Sheet1!1:1',
+  });
+
+  const row1 = result.data.values?.[0] || [];
+  let colIdx: number | null = null;
+
+  for (let i = COL_DEALERS_START; i < row1.length; i++) {
+    let cellValue = String(row1[i]).trim();
+    try {
+      if (cellValue.includes('.') || cellValue.toUpperCase().includes('E')) {
+        cellValue = String(parseInt(parseFloat(cellValue).toString()));
+      }
+    } catch {
+      // ignore
+    }
+
+    if (cellValue === dealerNo) {
+      colIdx = i;
+      break;
+    }
+  }
+
+  if (colIdx === null) {
+    return false;
+  }
+
+  // Delete the column
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: 0,
+            dimension: 'COLUMNS',
+            startIndex: colIdx,
+            endIndex: colIdx + 1,
+          },
+        },
+      }],
+    },
+  });
+
+  return true;
+}
+
+async function createDriveFolder(dealerName: string, auth: ReturnType<typeof getGoogleAuth>) {
+  const drive = google.drive({ version: 'v3', auth });
+
+  // Check if folder exists
+  const escapedName = dealerName.replace(/'/g, "\\'");
+  const response = await drive.files.list({
+    q: `name='${escapedName}' and '${DEALERS_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id, name)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  if (response.data.files?.length) {
+    return response.data.files[0].id;
+  }
+
+  // Create new folder
+  const folder = await drive.files.create({
+    requestBody: {
+      name: dealerName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [DEALERS_FOLDER_ID],
+    },
+    fields: 'id',
+    supportsAllDrives: true,
+  });
+
+  return folder.data.id;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { action, dealer_name, source, secret } = body;
+
+    // Verify secret if configured
+    if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!action || !dealer_name) {
+      return NextResponse.json(
+        { error: 'Missing required fields: action, dealer_name' },
+        { status: 400 }
+      );
+    }
+
+    if (!['promote', 'demote'].includes(action)) {
+      return NextResponse.json(
+        { error: 'Invalid action. Must be "promote" or "demote"' },
+        { status: 400 }
+      );
+    }
+
+    const db = new Database(DB_PATH);
+    const dealer = findDealerByName(db, dealer_name);
+
+    if (!dealer) {
+      db.close();
+      return NextResponse.json(
+        { error: `Dealer not found: ${dealer_name}` },
+        { status: 404 }
+      );
+    }
+
+    const auth = getGoogleAuth();
+    const results: string[] = [];
+
+    if (action === 'promote') {
+      if (dealer.program_status === 'FULL') {
+        db.close();
+        return NextResponse.json({
+          success: true,
+          message: 'Dealer is already FULL status',
+          dealer_no: dealer.dealer_no,
+          display_name: dealer.display_name,
+        });
+      }
+
+      // Update database
+      db.prepare(`
+        UPDATE dealers
+        SET program_status = 'FULL',
+            needs_logo = 1,
+            updated_at = datetime('now')
+        WHERE dealer_no = ?
+      `).run(dealer.dealer_no);
+      results.push('Database updated to FULL');
+
+      // Create Drive folder
+      const folderId = await createDriveFolder(dealer.display_name, auth);
+      results.push(`Drive folder: ${folderId}`);
+
+      // Add to spreadsheet
+      const colLetter = await addToSpreadsheet(dealer, auth);
+      results.push(`Added to spreadsheet column ${colLetter}`);
+
+    } else {
+      // demote
+      if (dealer.program_status === 'CONTENT') {
+        db.close();
+        return NextResponse.json({
+          success: true,
+          message: 'Dealer is already CONTENT status',
+          dealer_no: dealer.dealer_no,
+          display_name: dealer.display_name,
+        });
+      }
+
+      // Update database
+      db.prepare(`
+        UPDATE dealers
+        SET program_status = 'CONTENT',
+            updated_at = datetime('now')
+        WHERE dealer_no = ?
+      `).run(dealer.dealer_no);
+      results.push('Database updated to CONTENT');
+
+      // Remove from spreadsheet
+      const removed = await removeFromSpreadsheet(dealer.dealer_no, auth);
+      results.push(removed ? 'Removed from spreadsheet' : 'Not found in spreadsheet');
+    }
+
+    db.close();
+
+    // Log the change
+    console.log(`[dealer-status] ${action}: ${dealer.display_name} (${dealer.dealer_no}) - source: ${source || 'unknown'}`);
+
+    return NextResponse.json({
+      success: true,
+      action,
+      dealer_no: dealer.dealer_no,
+      display_name: dealer.display_name,
+      results,
+      next_steps: action === 'promote' ? [
+        'Upload logo to dealer Drive folder',
+        'Update creatomate_logo in database',
+        'Send fb_admin_accepted email',
+      ] : [],
+    });
+
+  } catch (error) {
+    console.error('Dealer status update error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}

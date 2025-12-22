@@ -1,6 +1,6 @@
 # Woodhouse Creative - Database Documentation
 
-**Last Updated:** December 18, 2025  
+**Last Updated:** December 21, 2025
 **Database:** `~/woodhouse_creative/data/sqlite/creative.db`
 
 ---
@@ -16,7 +16,8 @@ This database supports Woodhouse Agency's Allied Air Turnkey Social Media progra
 | **Dealer Number** | 8-digit ID assigned by Allied Air (e.g., `10231005`). Primary key across all systems. |
 | **FULL vs CONTENT** | FULL = we post for them (124 dealers). CONTENT = we create, they post (209 dealers). |
 | **Creatomate Fields** | Validated data specifically for video reels: `display_name`, `creatomate_phone`, `creatomate_website`, `creatomate_logo` |
-| **Ready for Automate** | Logo resized/rebuilt AND all Creatomate fields validated. 95/124 currently ready. |
+| **Ready for Automate** | Logo resized/rebuilt AND all Creatomate fields validated. **124/124 ready.** |
+| **Region** | Geographic region: `NORTH`, `SOUTH`, or `CANADA`. Used for scheduling and reporting. |
 
 ---
 
@@ -176,16 +177,19 @@ CREATE TABLE dealer_contacts (
 
 | Data Point | Count | % | Notes |
 |------------|-------|---|-------|
+| Display Name | 124/124 | 100% | All have display_name |
 | Phone | 124/124 | 100% | All have creatomate_phone |
-| Name | 123/124 | 99% | 1 missing display_name |
-| Website | 121/124 | 98% | 3 no website |
-| Logo | 122/124 | 98% | 2 need logos |
+| Website | 121/124 | 98% | 3 no website (expected) |
+| Logo | 124/124 | 100% | All have creatomate_logo |
 | Facebook ID | 124/124 | 100% | All have FB page ID |
-| **Ready for Automation** | **95/124** | **77%** | Logo resized + QA |
+| Region | 124/124 | 100% | NORTH: 81, SOUTH: 39, CANADA: 4 |
+| **Ready for Automation** | **124/124** | **100%** | All ready ✅ |
 
 ---
 
-## Import Scripts
+## Scripts
+
+### Import Scripts
 
 | Script | Purpose | Source File |
 |--------|---------|-------------|
@@ -196,6 +200,46 @@ CREATE TABLE dealer_contacts (
 | `import_creatomate_validated.py` | Import all validated Creatomate fields | Import Creatomate Data Validated.xlsx |
 | `import_missing_fb.py` | Manual FB page lookups | Hardcoded in script |
 | `crawl_websites.py` | Scrape dealer websites for contacts | Dealer websites |
+
+### Automation Scripts
+
+| Script | Purpose | Notes |
+|--------|---------|-------|
+| `sync_spreadsheet.py` | Sync dealer data to Google Sheets | Syncs rows 5-11 from database |
+| `batch_render.py` | Batch render videos via Creatomate | Uploads to Google Drive |
+| `email_sender/send_email.py` | Send dealer emails via Resend | Auto-updates spreadsheet status |
+| `update_dealer_status.py` | Promote/demote dealers | CONTENT <-> FULL status changes |
+| `gmail_monitor.gs` | Apps Script for Gmail | Monitors FB admin emails |
+| `export_full_dealers.py` | Export CSV for Creatomate | All 124 FULL dealers |
+
+---
+
+## Scheduling Spreadsheet Structure
+
+The scheduling spreadsheet (`1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY`) is synced from the database.
+
+### Row Structure
+
+| Row | Field | Source | Notes |
+|-----|-------|--------|-------|
+| 1 | Dealer Number | Manual | Primary key for column matching |
+| 2 | Schedule Email Status | Olivia | Dropdown: Pending, Done, Email Sent |
+| 3 | Last Post Date | Olivia | When posts were last scheduled |
+| 4 | Who Posted | Olivia | Who scheduled the posts |
+| 5 | First Name | Database | `contact_first_name` |
+| 6 | Email | Database | `contact_email` |
+| 7 | Region | Database | NORTH, SOUTH, or CANADA |
+| 8 | Website | Database | `creatomate_website` |
+| 9 | Phone | Database | `creatomate_phone` |
+| 10 | Distributor | Database | `dealer_name` from Allied |
+| 11 | Display Name | Database | Clean name for posts |
+| 12+ | Post Rows | Both | Post number, base copy, personalized copy per dealer |
+
+### Sync Process
+
+1. **Database → Spreadsheet**: `sync_spreadsheet.py --sync-dealers` updates rows 5-11
+2. **Post Copy**: `sync_spreadsheet.py --post 666` replaces `{phone}`, `{website}`, `{name}` in base copy
+3. **Email Status**: `send_email.py` auto-updates row 2 to "Email Sent" after sending
 
 ---
 
@@ -229,9 +273,18 @@ ORDER BY contact_type, source;
 ### Summary by source
 ```sql
 SELECT source, contact_type, COUNT(*) as count
-FROM dealer_contacts 
+FROM dealer_contacts
 GROUP BY source, contact_type
 ORDER BY source, contact_type;
+```
+
+### Region breakdown
+```sql
+SELECT region, COUNT(*) as count
+FROM dealers
+WHERE program_status = 'FULL'
+GROUP BY region;
+-- Result: NORTH: 81, SOUTH: 39, CANADA: 4
 ```
 
 ---
@@ -278,6 +331,47 @@ The `dealer_contacts` table preserves ALL sources so we can:
 - Audit where data came from
 - Re-validate if needed
 - Handle conflicts intelligently
+
+---
+
+## Google Drive Resources
+
+All automation files in: `Shared drives/Woodhouse Social/Creative Automation/Scheduling Spreadsheet/`
+
+| Resource | File ID | Purpose |
+|----------|---------|---------|
+| Scheduling Spreadsheet | `1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY` | Dealer columns, post rows, Olivia's workflow |
+| Posts Excel (No Images) | `1-lhgjbNL1QBFNLZ5eSQSdaJTwIX0JKfE` | Post archive - read/write by automation |
+| Dealers Folder | `1QwyyE9Pq-p8u-TEz7B5nC-14BERpDPmv` | Individual dealer folders (logos, videos) |
+
+---
+
+## Posts Excel Structure
+
+The Posts Excel file contains all approved social media posts (656+ posts as of December 2025).
+
+### Columns
+
+| Column | Field | Description |
+|--------|-------|-------------|
+| A | Post # | Sequential post number (1-656+) |
+| B | Season | Fall, Winter, Spring, Summer |
+| C | Post Copy | Social media copy text with placeholders `{name}`, `{phone}`, `{website}` |
+| D | Image | Image reference (manual updates only) |
+| E | Subject Matter | Topic category (heating, cooling, maintenance, etc.) |
+| F | Tag 1 | Primary content tag |
+| G | Tag 2 | Secondary content tag |
+| H | Tag 3 | Tertiary content tag |
+| I | Notes | Creation date or notes |
+| J | Comments | Additional comments |
+| K | AAE APPROVED | Approval status from Allied Air |
+
+### Usage
+
+1. **Read posts by number**: Fetch row where Column A = post number
+2. **Filter by season**: Query Column B for seasonal campaigns
+3. **Find by subject**: Search Column E for topic-based selection
+4. **Populate spreadsheet**: Replace placeholders in Column C with dealer data
 
 ---
 
