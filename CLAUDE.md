@@ -3,7 +3,7 @@
 **Purpose:** Internal creative automation for Woodhouse Agency Allied Air dealers
 **Status:** Active - 124 FULL dealers ready for automation
 **Deployed:** https://woodhouse-creative.vercel.app
-**Last Updated:** December 22, 2025
+**Last Updated:** December 23, 2025
 
 ---
 
@@ -34,8 +34,9 @@
 | **Ready for Automation** | **124/124** | All ready |
 
 ### Batch Rendering Complete
-- **Post 666 Complete:** 124/124 videos rendered (Dec 21, 2025)
+- **Posts 666-672 Complete:** 882 videos rendered (Dec 22, 2025)
 - All videos uploaded to Google Drive dealer folders
+- Cron processes 25 jobs/minute (Creatomate rate limit: 30 req/10s)
 - Script: `scripts/batch_render.py`
 
 ---
@@ -92,6 +93,20 @@
 - Uploads to Google Drive staging folder
 - API: `/api/admin/save-logo-staging`
 
+### 7. Populate Post Copy (Dashboard)
+- Enter base copy with variable placeholders in dashboard
+- Variable picker buttons insert `{name}`, `{phone}`, `{website}` at cursor position
+- Populates personalized copy to all dealer columns in scheduling spreadsheet
+- Saves base copy to column C for reference
+- API: `/api/admin/populate-post-copy`
+
+### 8. Auto-Archive Old Posts
+- When new renders complete, old posts are automatically archived
+- Reads active post numbers from scheduling spreadsheet column A (rows 13+)
+- Moves videos with post numbers NOT in spreadsheet to `Archive/` subfolder
+- Archive subfolders are created automatically in each dealer's Drive folder
+- Integrated into webhook handler: [route.ts:188-200](app/api/webhooks/creatomate/route.ts#L188-L200)
+
 ---
 
 ## Google Apps Scripts (External)
@@ -127,6 +142,7 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 ### `/admin` - Main Dashboard
 - **Excel Sync:** Preview/apply changes from Allied Excel
 - **Batch Render:** Submit post number + template for rendering
+- **Populate Post Copy:** Enter base copy with variable picker, populate to all dealer columns
 - **Process Done Emails:** Send emails to dealers marked "Done" in spreadsheet
 - **Quick Stats:** 124 FULL dealers, 656+ posts, 100% ready
 
@@ -147,9 +163,9 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 
 ---
 
-## API Routes (25 Total)
+## API Routes (26 Total)
 
-### Admin Routes `/api/admin/` (17 endpoints)
+### Admin Routes `/api/admin/` (18 endpoints)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -170,6 +186,7 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 | `/posts-excel` | GET | Fetch post archive spreadsheet |
 | `/submit-post` | POST | Submit new post to archive |
 | `/open-excel` | GET | Return link to Allied Excel |
+| `/populate-post-copy` | GET/POST | Preview/populate personalized post copy to all dealers |
 
 ### Creative Automation Routes `/api/creative/` (5 endpoints)
 
@@ -213,7 +230,7 @@ woodhouse_creative/
 ├── lib/
 │   ├── firebase.ts             # Firestore connection
 │   ├── creatomate.ts           # Creatomate API client
-│   ├── google-drive.ts         # Google Drive upload
+│   ├── google-drive.ts         # Google Drive upload, archive, move files
 │   ├── renderQueue.ts          # Queue management (33 functions)
 │   └── types/
 │       └── renderQueue.ts      # TypeScript interfaces
@@ -379,12 +396,18 @@ python3 scripts/update_dealer_status.py --demote "Dealer Name"
 # Sync dealer metadata (rows 5-11)
 python3 scripts/sync_spreadsheet.py --sync-dealers
 
-# Populate post copy for a specific post
+# Populate post copy for a specific post (CLI)
 python3 scripts/sync_spreadsheet.py --post 666
 
 # Both at once
 python3 scripts/sync_spreadsheet.py --sync-dealers --post 666
 ```
+
+### Populate post copy (Dashboard - preferred)
+Use the dashboard at `/admin` - "Populate Post Copy" section:
+1. Enter post number
+2. Type base copy, use variable picker buttons to insert `{name}`, `{phone}`, `{website}`
+3. Click "Preview" to see dry run, or "Populate All" to write to spreadsheet
 
 ### Batch render videos
 ```bash
