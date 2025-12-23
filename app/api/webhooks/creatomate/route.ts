@@ -12,11 +12,63 @@ import {
   getJobsByBatchId,
 } from '@/lib/renderQueue';
 import { verifyWebhookSignature, downloadVideo } from '@/lib/creatomate';
-import { uploadToGoogleDrive } from '@/lib/google-drive';
+import { uploadToGoogleDrive, archiveOldPosts } from '@/lib/google-drive';
+import { google } from 'googleapis';
 import type {
   CreatomateWebhookPayload,
   CreatomateMetadata,
 } from '@/lib/types/renderQueue';
+
+const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
+
+/**
+ * Get active post numbers from the scheduling spreadsheet
+ */
+async function getActivePostNumbers(): Promise<Set<number>> {
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!serviceAccountEmail || !privateKey) {
+    console.error('Missing Google credentials for spreadsheet access');
+    return new Set();
+  }
+
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: serviceAccountEmail,
+        private_key: privateKey,
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    // Get column A (post numbers) starting from row 13
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet1!A13:A200', // Post rows start at row 13
+    });
+
+    const values = response.data.values || [];
+    const postNumbers = new Set<number>();
+
+    for (const row of values) {
+      if (row[0]) {
+        const num = parseInt(row[0]);
+        if (!isNaN(num)) {
+          postNumbers.add(num);
+        }
+      }
+    }
+
+    console.log(`Found ${postNumbers.size} active post numbers in spreadsheet`);
+    return postNumbers;
+  } catch (error) {
+    console.error('Error fetching active post numbers:', error);
+    return new Set();
+  }
+}
 
 /**
  * POST /api/webhooks/creatomate
@@ -132,6 +184,20 @@ export async function POST(request: NextRequest) {
         const sanitizedName = job.businessName.replace(/[/\\?%*:|"<>]/g, '-');
         const fileName = `Post ${metadata.postNumber}_${sanitizedName}.mp4`;
         const folderPath = `Dealers/${sanitizedName}`;
+
+        // Archive old posts that are no longer in the spreadsheet
+        try {
+          const activePostNumbers = await getActivePostNumbers();
+          if (activePostNumbers.size > 0) {
+            const archivedCount = await archiveOldPosts(folderPath, activePostNumbers);
+            if (archivedCount > 0) {
+              console.log(`📦 Archived ${archivedCount} old post(s) for ${job.businessName}`);
+            }
+          }
+        } catch (archiveError) {
+          // Don't fail the whole upload if archiving fails
+          console.error('Error archiving old posts (continuing with upload):', archiveError);
+        }
 
         console.log(`Uploading to Google Drive: ${folderPath}/${fileName}`);
 

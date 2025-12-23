@@ -234,6 +234,150 @@ export async function deleteFile(fileId: string): Promise<boolean> {
 }
 
 /**
+ * List files in a folder
+ *
+ * @param folderId - Google Drive folder ID
+ * @param mimeType - Optional filter by MIME type (e.g., "video/mp4")
+ * @returns Array of files with id, name, and mimeType
+ */
+export async function listFilesInFolder(
+  folderId: string,
+  mimeType?: string
+): Promise<{ id: string; name: string; mimeType: string }[]> {
+  try {
+    const drive = getDriveClient();
+
+    let query = `'${folderId}' in parents and trashed=false`;
+    if (mimeType) {
+      query += ` and mimeType='${mimeType}'`;
+    }
+
+    const response = await drive.files.list({
+      q: query,
+      fields: 'files(id, name, mimeType)',
+      spaces: 'drive',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+
+    return (response.data.files || []).map((f) => ({
+      id: f.id!,
+      name: f.name!,
+      mimeType: f.mimeType!,
+    }));
+  } catch (error) {
+    console.error('Error listing files in folder:', error);
+    return [];
+  }
+}
+
+/**
+ * Get folder ID by path (creates if not exists)
+ *
+ * @param path - Folder path like "Dealers/ABC Heating"
+ * @returns Folder ID
+ */
+export async function getFolderIdByPath(path: string): Promise<string> {
+  return ensureFolderPath(path);
+}
+
+/**
+ * Move file to a different folder
+ *
+ * @param fileId - Google Drive file ID
+ * @param currentParentId - Current parent folder ID
+ * @param newParentId - New parent folder ID
+ * @returns true if moved successfully
+ */
+export async function moveFile(
+  fileId: string,
+  currentParentId: string,
+  newParentId: string
+): Promise<boolean> {
+  try {
+    const drive = getDriveClient();
+
+    await drive.files.update({
+      fileId,
+      addParents: newParentId,
+      removeParents: currentParentId,
+      supportsAllDrives: true,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error moving file:', error);
+    return false;
+  }
+}
+
+/**
+ * Archive old post videos in a dealer's folder
+ *
+ * Moves all "Post XXX_*.mp4" files that are NOT in the activePostNumbers list
+ * to an "Archive" subfolder within the dealer's folder.
+ *
+ * @param dealerFolderPath - Path to dealer folder (e.g., "Dealers/ABC Heating")
+ * @param activePostNumbers - Set of post numbers that should NOT be archived
+ * @returns Number of files archived
+ */
+export async function archiveOldPosts(
+  dealerFolderPath: string,
+  activePostNumbers: Set<number>
+): Promise<number> {
+  try {
+    const drive = getDriveClient();
+
+    // Get dealer folder ID
+    const dealerFolderId = await getFolderIdByPath(dealerFolderPath);
+
+    // List all video files in dealer folder
+    const files = await listFilesInFolder(dealerFolderId, 'video/mp4');
+
+    // Filter to only "Post XXX_*.mp4" files
+    const postFiles = files.filter((f) => f.name.startsWith('Post '));
+
+    // Find files to archive (post numbers not in activePostNumbers)
+    const filesToArchive: { id: string; name: string; postNumber: number }[] = [];
+
+    for (const file of postFiles) {
+      // Extract post number from filename like "Post 666_Dealer Name.mp4"
+      const match = file.name.match(/^Post (\d+)_/);
+      if (match) {
+        const postNumber = parseInt(match[1]);
+        if (!activePostNumbers.has(postNumber)) {
+          filesToArchive.push({ id: file.id, name: file.name, postNumber });
+        }
+      }
+    }
+
+    if (filesToArchive.length === 0) {
+      return 0;
+    }
+
+    // Get or create Archive subfolder
+    const archiveFolderId = await ensureFolderPath(`${dealerFolderPath}/Archive`);
+
+    // Move files to archive
+    let archivedCount = 0;
+    for (const file of filesToArchive) {
+      const success = await moveFile(file.id, dealerFolderId, archiveFolderId);
+      if (success) {
+        console.log(`📦 Archived: ${file.name}`);
+        archivedCount++;
+      } else {
+        console.error(`Failed to archive: ${file.name}`);
+      }
+    }
+
+    return archivedCount;
+  } catch (error) {
+    console.error('Error archiving old posts:', error);
+    return 0;
+  }
+}
+
+/**
  * Test Google Drive connection
  *
  * @returns true if connection works

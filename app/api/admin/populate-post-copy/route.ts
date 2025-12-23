@@ -2,11 +2,11 @@
  * POST /api/admin/populate-post-copy
  *
  * Populates personalized post copy for all dealers in the scheduling spreadsheet.
- * Reads base copy from column C for a given post row, replaces variables with
- * dealer-specific values, and writes to each dealer's column.
+ * Takes base copy from request body, replaces variables with dealer-specific values,
+ * and writes to each dealer's column.
  *
  * Variables supported:
- *   {phone} or {number} - Dealer's phone number (from row 9)
+ *   {phone} - Dealer's phone number (from row 9)
  *   {website} - Dealer's website (from row 8)
  *   {name} - Dealer's display name (from row 11)
  */
@@ -62,16 +62,20 @@ function colToLetter(colIdx: number): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { postNumber, dryRun = false } = body;
+    const { postNumber, baseCopy, dryRun = false } = body;
 
     if (!postNumber) {
       return NextResponse.json({ error: 'Post number is required' }, { status: 400 });
     }
 
+    if (!baseCopy) {
+      return NextResponse.json({ error: 'Base copy is required' }, { status: 400 });
+    }
+
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Read all data from sheet
+    // Read spreadsheet to get dealer data and find post row
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: 'Sheet1!A1:ZZ200', // Wide range to capture all dealers
@@ -81,8 +85,6 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Spreadsheet is empty' }, { status: 500 });
     }
-
-    const maxCols = Math.max(...rows.map(r => r.length));
 
     // Find the post row
     let postRowIdx: number | null = null;
@@ -104,19 +106,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Post ${postNumber} not found in spreadsheet` }, { status: 404 });
     }
 
-    // Get base copy
-    const baseCopy = getCellValue(rows, postRowIdx, COL_BASE_COPY);
-    if (!baseCopy) {
-      return NextResponse.json({ error: `No base copy found in column C for post ${postNumber}` }, { status: 400 });
-    }
-
     // Get dealer columns
     const dealerRow = rows[ROW_DEALER_NO] || [];
-    const numDealers = dealerRow.length - COL_DEALERS_START;
 
     // Build updates
     const updates: { range: string; values: string[][] }[] = [];
     const preview: { dealerNo: string; name: string; copy: string }[] = [];
+
+    // Also save base copy to column C
+    const baseCopyColLetter = colToLetter(COL_BASE_COPY);
+    updates.push({
+      range: `Sheet1!${baseCopyColLetter}${postRowIdx + 1}`,
+      values: [[baseCopy]],
+    });
 
     for (let colIdx = COL_DEALERS_START; colIdx < dealerRow.length; colIdx++) {
       const dealerNo = getCellValue(rows, ROW_DEALER_NO, colIdx);
@@ -131,7 +133,6 @@ export async function POST(request: NextRequest) {
       // Replace variables
       let personalized = baseCopy;
       personalized = personalized.replace(/{phone}/g, phone);
-      personalized = personalized.replace(/{number}/g, phone); // Alias for {phone}
       personalized = personalized.replace(/{website}/g, website);
       personalized = personalized.replace(/{name}/g, name);
 
@@ -156,9 +157,9 @@ export async function POST(request: NextRequest) {
         dryRun: true,
         postNumber,
         baseCopy,
-        totalDealers: updates.length,
+        totalDealers: preview.length,
         preview: preview.slice(0, 5),
-        message: `Would update ${updates.length} dealer cells for post ${postNumber}`,
+        message: `Would update ${preview.length} dealer cells for post ${postNumber}`,
       });
     }
 
@@ -175,8 +176,8 @@ export async function POST(request: NextRequest) {
       success: true,
       postNumber,
       baseCopy,
-      totalUpdated: updates.length,
-      message: `Updated ${updates.length} dealer cells for post ${postNumber}`,
+      totalUpdated: preview.length,
+      message: `Updated ${preview.length} dealer cells for post ${postNumber}`,
     });
   } catch (error) {
     console.error('Populate post copy error:', error);
@@ -188,13 +189,14 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/admin/populate-post-copy?postNumber=666
+ * GET /api/admin/populate-post-copy?postNumber=666&baseCopy=...
  *
  * Preview what would be populated (dry run)
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const postNumberStr = searchParams.get('postNumber');
+  const baseCopy = searchParams.get('baseCopy');
 
   if (!postNumberStr) {
     return NextResponse.json({ error: 'postNumber query param is required' }, { status: 400 });
@@ -205,10 +207,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'postNumber must be a number' }, { status: 400 });
   }
 
+  if (!baseCopy) {
+    return NextResponse.json({ error: 'baseCopy query param is required' }, { status: 400 });
+  }
+
   // Create a mock request for the POST handler with dryRun=true
   const mockRequest = new NextRequest(request.url, {
     method: 'POST',
-    body: JSON.stringify({ postNumber, dryRun: true }),
+    body: JSON.stringify({ postNumber, baseCopy, dryRun: true }),
   });
 
   return POST(mockRequest);

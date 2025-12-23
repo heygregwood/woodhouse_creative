@@ -59,6 +59,7 @@ export default function CreativeAdminPage() {
 
   // Populate Post Copy State
   const [populatePostNumber, setPopulatePostNumber] = useState('');
+  const [populateBaseCopy, setPopulateBaseCopy] = useState('');
   const [populateLoading, setPopulateLoading] = useState(false);
   const [populateResult, setPopulateResult] = useState<{
     success?: boolean;
@@ -70,6 +71,24 @@ export default function CreativeAdminPage() {
     preview?: { dealerNo: string; name: string; copy: string }[];
     message?: string;
   } | null>(null);
+
+  // Insert variable at cursor position
+  const insertVariable = (variable: string) => {
+    const textarea = document.getElementById('baseCopyTextarea') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = populateBaseCopy.substring(0, start) + variable + populateBaseCopy.substring(end);
+      setPopulateBaseCopy(newText);
+      // Restore focus and cursor position after the inserted text
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    } else {
+      setPopulateBaseCopy(populateBaseCopy + variable);
+    }
+  };
 
   // Fetch dealers with "Done" status
   const fetchDoneDealers = useCallback(async () => {
@@ -270,13 +289,21 @@ export default function CreativeAdminPage() {
 
   // Preview post copy population
   const handlePreviewPopulate = async () => {
-    if (!populatePostNumber) return;
+    if (!populatePostNumber || !populateBaseCopy) return;
 
     try {
       setPopulateLoading(true);
       setPopulateResult(null);
 
-      const response = await fetch(`/api/admin/populate-post-copy?postNumber=${populatePostNumber}`);
+      const response = await fetch('/api/admin/populate-post-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postNumber: parseInt(populatePostNumber),
+          baseCopy: populateBaseCopy,
+          dryRun: true,
+        }),
+      });
       const data = await response.json();
       setPopulateResult(data);
     } catch (error) {
@@ -290,7 +317,7 @@ export default function CreativeAdminPage() {
 
   // Execute post copy population
   const handlePopulatePostCopy = async () => {
-    if (!populatePostNumber) return;
+    if (!populatePostNumber || !populateBaseCopy) return;
 
     try {
       setPopulateLoading(true);
@@ -298,7 +325,10 @@ export default function CreativeAdminPage() {
       const response = await fetch('/api/admin/populate-post-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postNumber: parseInt(populatePostNumber) }),
+        body: JSON.stringify({
+          postNumber: parseInt(populatePostNumber),
+          baseCopy: populateBaseCopy,
+        }),
       });
       const data = await response.json();
       setPopulateResult(data);
@@ -729,43 +759,88 @@ export default function CreativeAdminPage() {
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 space-y-4">
+              {/* Post Number */}
               <div className="flex gap-3 items-end">
-                <div className="flex-1 max-w-xs">
+                <div className="w-32">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Post Number
+                    Post #
                   </label>
                   <input
                     type="number"
                     className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none"
                     value={populatePostNumber}
                     onChange={(e) => setPopulatePostNumber(e.target.value)}
-                    placeholder="e.g., 666"
+                    placeholder="666"
                   />
                 </div>
+              </div>
+
+              {/* Base Copy Textarea */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Post Copy
+                  </label>
+                  <div className="flex gap-1">
+                    <span className="text-xs text-gray-500 mr-2">Insert:</span>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{name}')}
+                      className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium"
+                    >
+                      Name
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{phone}')}
+                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                    >
+                      Phone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{website}')}
+                      className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors font-medium"
+                    >
+                      Website
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  id="baseCopyTextarea"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none resize-none"
+                  rows={4}
+                  value={populateBaseCopy}
+                  onChange={(e) => setPopulateBaseCopy(e.target.value)}
+                  placeholder="Enter post copy here. Use the buttons above to insert variables like {name}, {phone}, or {website}."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Variables will be replaced with each dealer&apos;s values: <code className="bg-purple-100 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-blue-100 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-green-100 px-1 rounded">{'{website}'}</code> = Website
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
                 <button
                   onClick={handlePreviewPopulate}
-                  disabled={populateLoading || !populatePostNumber}
+                  disabled={populateLoading || !populatePostNumber || !populateBaseCopy}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 font-medium transition-colors"
                 >
                   {populateLoading ? 'Loading...' : 'Preview'}
                 </button>
                 <button
                   onClick={handlePopulatePostCopy}
-                  disabled={populateLoading || !populatePostNumber}
+                  disabled={populateLoading || !populatePostNumber || !populateBaseCopy}
                   className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-300 font-medium transition-colors"
                 >
-                  {populateLoading ? 'Populating...' : 'Populate All'}
+                  {populateLoading ? 'Populating...' : 'Populate All Dealers'}
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500 mt-2">
-                Replaces {'{phone}'}, {'{website}'}, {'{name}'} in base copy (column C) with each dealer&apos;s values
-              </p>
-
               {/* Result */}
               {populateResult && (
-                <div className="mt-4">
+                <div>
                   {populateResult.error ? (
                     <div className="p-4 bg-red-50 border border-red-500 rounded-lg text-red-800">
                       <p className="font-medium">Error</p>
@@ -779,13 +854,6 @@ export default function CreativeAdminPage() {
                       <p className={`text-sm mt-1 ${populateResult.dryRun ? 'text-purple-700' : 'text-green-700'}`}>
                         {populateResult.message}
                       </p>
-
-                      {populateResult.baseCopy && (
-                        <div className="mt-3 p-3 bg-white rounded border border-gray-200">
-                          <p className="text-xs font-medium text-gray-500 mb-1">Base Copy (Column C):</p>
-                          <p className="text-sm text-gray-800">{populateResult.baseCopy}</p>
-                        </div>
-                      )}
 
                       {populateResult.preview && populateResult.preview.length > 0 && (
                         <div className="mt-3">
