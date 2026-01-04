@@ -75,6 +75,12 @@ export default function PostsPage() {
   // Email delivery status state
   const [emailStatuses, setEmailStatuses] = useState<Record<string, EmailDeliveryStatus>>({});
 
+  // Sorting state
+  type SortField = 'dealer' | 'region' | 'status' | 'email' | 'lastPost' | 'postedBy';
+  type SortDirection = 'asc' | 'desc';
+  const [sortField, setSortField] = useState<SortField>('dealer');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
   // Fetch email delivery status for a list of emails
   const fetchEmailStatuses = useCallback(async (emails: string[]) => {
     if (emails.length === 0) return;
@@ -287,6 +293,91 @@ export default function PostsPage() {
     },
     {} as Record<string, number>
   ) || {};
+
+  // Handle column header click for sorting
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Parse date string like "21-Jan" or "15-Dec" for sorting
+  const parsePostDate = (dateStr: string): Date | null => {
+    if (!dateStr || dateStr === '-') return null;
+    // Try to parse formats like "21-Jan", "15-Dec", "1-Feb"
+    const match = dateStr.match(/(\d{1,2})-(\w{3})/);
+    if (match) {
+      const day = parseInt(match[1]);
+      const monthStr = match[2];
+      const months: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const month = months[monthStr];
+      if (month !== undefined) {
+        // Assume current year, but if month is ahead of current month, use last year
+        const now = new Date();
+        let year = now.getFullYear();
+        if (month > now.getMonth() + 1) {
+          year--;
+        }
+        return new Date(year, month, day);
+      }
+    }
+    return null;
+  };
+
+  // Sort dealers based on current sort field and direction
+  const sortedDealers = spreadsheetStatus?.dealers ? [...spreadsheetStatus.dealers].sort((a, b) => {
+    let comparison = 0;
+
+    switch (sortField) {
+      case 'dealer':
+        comparison = (a.displayName || '').localeCompare(b.displayName || '');
+        break;
+      case 'region':
+        comparison = (a.region || '').localeCompare(b.region || '');
+        break;
+      case 'status':
+        // Custom order: Pending, Done, Email Sent
+        const statusOrder: Record<string, number> = { 'Pending': 0, 'Done': 1, 'Email Sent': 2 };
+        comparison = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+        break;
+      case 'email':
+        // Sort by email delivery status
+        const aStatus = emailStatuses[a.email?.toLowerCase()]?.latest_event_at;
+        const bStatus = emailStatuses[b.email?.toLowerCase()]?.latest_event_at;
+        if (!aStatus && !bStatus) comparison = 0;
+        else if (!aStatus) comparison = 1;
+        else if (!bStatus) comparison = -1;
+        else comparison = new Date(bStatus).getTime() - new Date(aStatus).getTime();
+        break;
+      case 'lastPost':
+        const aDate = parsePostDate(a.lastPostDate);
+        const bDate = parsePostDate(b.lastPostDate);
+        if (!aDate && !bDate) comparison = 0;
+        else if (!aDate) comparison = 1;
+        else if (!bDate) comparison = -1;
+        else comparison = bDate.getTime() - aDate.getTime();
+        break;
+      case 'postedBy':
+        comparison = (a.whoPosted || '').localeCompare(b.whoPosted || '');
+        break;
+    }
+
+    return sortDirection === 'asc' ? comparison : -comparison;
+  }) : [];
+
+  // Sort indicator component
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <span className="text-gray-300 ml-1">↕</span>;
+    }
+    return <span className="text-[#5378a8] ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -550,16 +641,46 @@ export default function PostsPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Dealer</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Region</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Last Post</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Posted By</th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('dealer')}
+                      >
+                        Dealer<SortIcon field="dealer" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('region')}
+                      >
+                        Region<SortIcon field="region" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('status')}
+                      >
+                        Status<SortIcon field="status" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('email')}
+                      >
+                        Email<SortIcon field="email" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('lastPost')}
+                      >
+                        Last Post<SortIcon field="lastPost" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                        onClick={() => handleSort('postedBy')}
+                      >
+                        Posted By<SortIcon field="postedBy" />
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {spreadsheetStatus?.dealers.map((dealer) => (
+                    {sortedDealers.map((dealer) => (
                       <tr key={dealer.dealerNo} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div>
@@ -628,7 +749,7 @@ export default function PostsPage() {
                       </tr>
                     ))}
 
-                    {(!spreadsheetStatus?.dealers || spreadsheetStatus.dealers.length === 0) && !loadingStatus && (
+                    {sortedDealers.length === 0 && !loadingStatus && (
                       <tr>
                         <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           No dealers found. Check API connection.
