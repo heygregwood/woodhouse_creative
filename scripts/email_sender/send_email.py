@@ -25,6 +25,12 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+# Import blocked dealers config (handles both direct and module import)
+try:
+    from scripts.email_sender.blocked_dealers import is_dealer_blocked
+except ImportError:
+    from blocked_dealers import is_dealer_blocked
+
 # Load environment variables
 env_path = Path(__file__).parent.parent.parent / '.env.local'
 load_dotenv(env_path)
@@ -271,6 +277,11 @@ def send_welcome_email(dealer_no: str) -> Dict[str, Any]:
     Send Welcome Email to new dealer
     Trigger: New dealer added to program (status = CONTENT or FULL)
     """
+    # Check blocklist (test accounts, etc.)
+    if is_dealer_blocked(dealer_no):
+        print(f"⚠️  Dealer {dealer_no} is blocked - skipping email")
+        return {'success': False, 'error': f'Dealer {dealer_no} is blocked from emails', 'blocked': True}
+
     dealer = get_dealer(dealer_no)
     if not dealer:
         return {'success': False, 'error': f'Dealer not found: {dealer_no}'}
@@ -310,6 +321,11 @@ def send_fb_admin_accepted_email(dealer_no: str, update_spreadsheet: bool = True
         dealer_no: Dealer number
         update_spreadsheet: If True, update spreadsheet status to 'Email Sent'
     """
+    # Check blocklist (test accounts, etc.)
+    if is_dealer_blocked(dealer_no):
+        print(f"⚠️  Dealer {dealer_no} is blocked - skipping email")
+        return {'success': False, 'error': f'Dealer {dealer_no} is blocked from emails', 'blocked': True}
+
     dealer = get_dealer(dealer_no)
     if not dealer:
         return {'success': False, 'error': f'Dealer not found: {dealer_no}'}
@@ -348,6 +364,11 @@ def send_first_post_scheduled_email(dealer_no: str, update_spreadsheet: bool = T
         dealer_no: Dealer number
         update_spreadsheet: If True, update spreadsheet status to 'Email Sent'
     """
+    # Check blocklist (test accounts, etc.)
+    if is_dealer_blocked(dealer_no):
+        print(f"⚠️  Dealer {dealer_no} is blocked - skipping email")
+        return {'success': False, 'error': f'Dealer {dealer_no} is blocked from emails', 'blocked': True}
+
     dealer = get_dealer(dealer_no)
     if not dealer:
         return {'success': False, 'error': f'Dealer not found: {dealer_no}'}
@@ -387,6 +408,11 @@ def send_post_scheduled_email(dealer_no: str, update_spreadsheet: bool = True) -
         dealer_no: Dealer number
         update_spreadsheet: If True, update spreadsheet status to 'Email Sent'
     """
+    # Check blocklist (test accounts, etc.)
+    if is_dealer_blocked(dealer_no):
+        print(f"⚠️  Dealer {dealer_no} is blocked - skipping email")
+        return {'success': False, 'error': f'Dealer {dealer_no} is blocked from emails', 'blocked': True}
+
     dealer = get_dealer(dealer_no)
     if not dealer:
         return {'success': False, 'error': f'Dealer not found: {dealer_no}'}
@@ -420,11 +446,16 @@ def send_content_ready_email(dealer_no: str, download_url: str) -> Dict[str, Any
     """
     Send Content Ready Email to CONTENT dealers
     Trigger: Monthly content package is ready for download
-    
+
     Args:
         dealer_no: Dealer number
         download_url: Dropbox/Drive link to content package
     """
+    # Check blocklist (test accounts, etc.)
+    if is_dealer_blocked(dealer_no):
+        print(f"⚠️  Dealer {dealer_no} is blocked - skipping email")
+        return {'success': False, 'error': f'Dealer {dealer_no} is blocked from emails', 'blocked': True}
+
     dealer = get_dealer(dealer_no)
     if not dealer:
         return {'success': False, 'error': f'Dealer not found: {dealer_no}'}

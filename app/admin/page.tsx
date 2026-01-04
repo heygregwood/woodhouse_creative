@@ -173,10 +173,14 @@ export default function CreativeAdminPage() {
     }
   };
 
-  // Process all dealers
+  // Process all dealers with rate limiting (Resend allows 2 req/sec)
   const handleProcessAll = async () => {
-    for (const dealer of doneDealers) {
-      await handleProcessDealer(dealer);
+    for (let i = 0; i < doneDealers.length; i++) {
+      await handleProcessDealer(doneDealers[i]);
+      // Wait 600ms between emails to stay under 2 req/sec limit
+      if (i < doneDealers.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
     }
   };
 

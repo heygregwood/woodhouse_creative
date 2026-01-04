@@ -60,7 +60,13 @@
 
 **Scripts:**
 - `scripts/email_sender/send_email.py` - Main email sending module
+- `scripts/email_sender/blocked_dealers.py` - Blocklist for test accounts
 - `scripts/process_done_status.py` - Batch process "Done" status dealers
+
+**Blocked Dealers:**
+- Test accounts are blocked from receiving emails via `lib/blocked-dealers.ts` (TypeScript) and `scripts/email_sender/blocked_dealers.py` (Python)
+- Currently blocked: `10491009` (GW Berkheimer HQ Test Account)
+- To add more: Edit both files and add dealer numbers to the `BLOCKED_DEALER_NOS` set
 
 ### 2. Spreadsheet Sync
 - Syncs dealer metadata from SQLite to Google Sheets

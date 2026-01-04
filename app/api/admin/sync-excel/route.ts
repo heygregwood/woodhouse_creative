@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
+import { isDealerBlocked } from '@/lib/blocked-dealers';
 
 const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'sync_from_excel.py');
 
@@ -184,15 +185,27 @@ export async function GET() {
 
       const emailResults: Array<{ dealer_no: string; email_type: string; success: boolean; error?: string }> = [];
 
-      // Send welcome emails to new dealers
+      // Send welcome emails to new dealers (skip blocked dealers)
+      // Rate limited to stay under Resend's 2 req/sec limit
+      const blockedDealers: string[] = [];
       if (previewResult.changes?.new) {
-        for (const dealer of previewResult.changes.new) {
+        for (let i = 0; i < previewResult.changes.new.length; i++) {
+          const dealer = previewResult.changes.new[i];
+          // Skip blocked dealers (test accounts, etc.)
+          if (isDealerBlocked(dealer.dealer_no)) {
+            blockedDealers.push(dealer.dealer_no);
+            continue;
+          }
           const emailResult = await sendEmail(dealer.dealer_no, 'welcome');
           emailResults.push({
             dealer_no: dealer.dealer_no,
             email_type: 'welcome',
             ...emailResult,
           });
+          // Wait 600ms between emails to stay under 2 req/sec limit
+          if (i < previewResult.changes.new.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 600));
+          }
         }
       }
 
@@ -218,6 +231,7 @@ export async function GET() {
         emailResults,
         pendingReviewCount: pendingReviewDealers.length,
         pendingReviewDealers,
+        blockedDealersSkipped: blockedDealers,
       });
     }
 
@@ -310,13 +324,24 @@ export async function POST() {
     // If successful and there are new dealers, send welcome emails
     if (result.success && result.changes?.new && result.changes.new.length > 0) {
       const emailResults: Array<{ dealer_no: string; success: boolean; error?: string }> = [];
+      const blockedDealers: string[] = [];
 
-      for (const dealer of result.changes.new) {
+      for (let i = 0; i < result.changes.new.length; i++) {
+        const dealer = result.changes.new[i];
+        // Skip blocked dealers (test accounts, etc.)
+        if (isDealerBlocked(dealer.dealer_no)) {
+          blockedDealers.push(dealer.dealer_no);
+          continue;
+        }
         const emailResult = await sendEmail(dealer.dealer_no, 'welcome');
         emailResults.push({
           dealer_no: dealer.dealer_no,
           ...emailResult,
         });
+        // Wait 600ms between emails to stay under 2 req/sec limit
+        if (i < result.changes.new.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
       }
 
       // Add email results to the response
@@ -325,6 +350,7 @@ export async function POST() {
         emailsSent: emailResults.filter(r => r.success).length,
         emailsFailed: emailResults.filter(r => !r.success).length,
         emailResults,
+        blockedDealersSkipped: blockedDealers,
       });
     }
 
