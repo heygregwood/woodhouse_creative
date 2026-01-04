@@ -23,6 +23,20 @@ interface DealerStatus {
   region: string;
 }
 
+interface EmailDeliveryStatus {
+  email: string;
+  latest_event: string | null;
+  latest_event_at: string | null;
+  events: {
+    sent?: string;
+    delivered?: string;
+    opened?: string;
+    clicked?: string;
+    bounced?: string;
+    complained?: string;
+  };
+}
+
 interface SpreadsheetStatus {
   dealers: DealerStatus[];
   postInfo: {
@@ -57,6 +71,29 @@ export default function PostsPage() {
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailResult, setEmailResult] = useState<{ success: boolean; message: string; sent?: number } | null>(null);
 
+  // Email delivery status state
+  const [emailStatuses, setEmailStatuses] = useState<Record<string, EmailDeliveryStatus>>({});
+
+  // Fetch email delivery status for a list of emails
+  const fetchEmailStatuses = useCallback(async (emails: string[]) => {
+    if (emails.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/admin/email-status?emails=${emails.join(',')}`);
+      const data = await response.json();
+
+      if (data.success && data.statuses) {
+        const statusMap: Record<string, EmailDeliveryStatus> = {};
+        for (const status of data.statuses) {
+          statusMap[status.email.toLowerCase()] = status;
+        }
+        setEmailStatuses(statusMap);
+      }
+    } catch (error) {
+      console.error('Failed to fetch email statuses:', error);
+    }
+  }, []);
+
   // Fetch current spreadsheet status
   const fetchSpreadsheetStatus = useCallback(async () => {
     try {
@@ -71,12 +108,20 @@ export default function PostsPage() {
       }
 
       setSpreadsheetStatus(data);
+
+      // Also fetch email delivery status for all dealers
+      if (data.dealers && data.dealers.length > 0) {
+        const emails = data.dealers
+          .map((d: DealerStatus) => d.email)
+          .filter((e: string) => e && e.includes('@'));
+        fetchEmailStatuses(emails);
+      }
     } catch (error) {
       setStatusError(error instanceof Error ? error.message : 'Failed to fetch status');
     } finally {
       setLoadingStatus(false);
     }
-  }, []);
+  }, [fetchEmailStatuses]);
 
   // Fetch post data from Posts Excel
   const fetchPostData = async (postNumber: string) => {
@@ -447,6 +492,7 @@ export default function PostsPage() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Dealer</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Region</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Last Post</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Posted By</th>
                     </tr>
@@ -478,6 +524,40 @@ export default function PostsPage() {
                             {dealer.status}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const emailStatus = emailStatuses[dealer.email?.toLowerCase()];
+                            if (!emailStatus?.latest_event) {
+                              return <span className="text-xs text-gray-400">-</span>;
+                            }
+                            const event = emailStatus.latest_event.replace('email.', '');
+                            const eventDate = emailStatus.latest_event_at
+                              ? new Date(emailStatus.latest_event_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                              : '';
+                            const eventColors: Record<string, string> = {
+                              'delivered': 'bg-green-100 text-green-800',
+                              'opened': 'bg-blue-100 text-blue-800',
+                              'clicked': 'bg-purple-100 text-purple-800',
+                              'bounced': 'bg-red-100 text-red-800',
+                              'complained': 'bg-red-100 text-red-800',
+                              'sent': 'bg-gray-100 text-gray-800',
+                            };
+                            const colorClass = eventColors[event] || 'bg-gray-100 text-gray-800';
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${colorClass}`}>
+                                  {event === 'clicked' ? '📧 Clicked' :
+                                   event === 'opened' ? '📖 Opened' :
+                                   event === 'delivered' ? '✅ Delivered' :
+                                   event === 'bounced' ? '❌ Bounced' :
+                                   event === 'complained' ? '🚫 Spam' :
+                                   event === 'sent' ? '📤 Sent' : event}
+                                </span>
+                                {eventDate && <span className="text-xs text-gray-400">{eventDate}</span>}
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {dealer.lastPostDate || '-'}
                         </td>
@@ -489,7 +569,7 @@ export default function PostsPage() {
 
                     {(!spreadsheetStatus?.dealers || spreadsheetStatus.dealers.length === 0) && !loadingStatus && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           No dealers found. Check API connection.
                         </td>
                       </tr>
@@ -497,7 +577,7 @@ export default function PostsPage() {
 
                     {loadingStatus && !spreadsheetStatus && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           Loading dealer status...
                         </td>
                       </tr>
