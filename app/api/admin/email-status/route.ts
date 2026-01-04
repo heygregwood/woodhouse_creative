@@ -64,10 +64,10 @@ export async function GET(request: NextRequest) {
 
     // Query email_status collection for the latest status per recipient
     // We need to query by recipient_email field
+    // Note: Removed orderBy to avoid needing a composite index
     const statusSnapshot = await db
       .collection('email_status')
       .where('recipient_email', 'in', emails.slice(0, 10)) // Firestore 'in' limit is 10
-      .orderBy('updated_at', 'desc')
       .get();
 
     for (const doc of statusSnapshot.docs) {
@@ -99,7 +99,6 @@ export async function GET(request: NextRequest) {
         const batchSnapshot = await db
           .collection('email_status')
           .where('recipient_email', 'in', batch)
-          .orderBy('updated_at', 'desc')
           .get();
 
         for (const doc of batchSnapshot.docs) {
