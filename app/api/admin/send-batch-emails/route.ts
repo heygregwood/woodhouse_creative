@@ -218,8 +218,11 @@ export async function POST(request: NextRequest) {
       const email = rows[ROWS.EMAIL]?.[col]?.toString().trim() || '';
       const displayName = dealerInfo[dealerNo] || '';
 
-      // Send email
+      // Send email with rate limiting (600ms delay between emails)
       const sent = await sendEmail({ dealerNo, firstName, email, displayName }, emailType);
+
+      // Rate limit: Wait 600ms between emails to stay under Resend's 2 req/sec limit
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       if (sent) {
         // Update status to "Email Sent"

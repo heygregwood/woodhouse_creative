@@ -69,6 +69,7 @@ export default function PostsPage() {
 
   // Auto-email state
   const [sendingEmails, setSendingEmails] = useState(false);
+  const [emailProgress, setEmailProgress] = useState<{ sent: number; total: number; current: string } | null>(null);
   const [emailResult, setEmailResult] = useState<{ success: boolean; message: string; sent?: number } | null>(null);
 
   // Email delivery status state
@@ -79,8 +80,21 @@ export default function PostsPage() {
     if (emails.length === 0) return;
 
     try {
-      const response = await fetch(`/api/admin/email-status?emails=${emails.join(',')}`);
-      const data = await response.json();
+      const response = await fetch(`/api/admin/email-status?emails=${encodeURIComponent(emails.join(','))}`);
+
+      // Check if response is OK before parsing JSON
+      if (!response.ok) {
+        console.error('Email status API error:', response.status, response.statusText);
+        return;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        console.error('Email status API returned empty response');
+        return;
+      }
+
+      const data = JSON.parse(text);
 
       if (data.success && data.statuses) {
         const statusMap: Record<string, EmailDeliveryStatus> = {};
@@ -188,7 +202,7 @@ export default function PostsPage() {
     }
   };
 
-  // Send emails to dealers with "Done" status
+  // Send emails to dealers with "Done" status - one at a time with rate limiting
   const handleSendEmails = async () => {
     if (!spreadsheetStatus?.dealers) return;
 
@@ -198,37 +212,63 @@ export default function PostsPage() {
       return;
     }
 
-    try {
-      setSendingEmails(true);
-      setEmailResult(null);
+    setSendingEmails(true);
+    setEmailResult(null);
+    setEmailProgress({ sent: 0, total: doneDealers.length, current: '' });
 
-      const response = await fetch('/api/admin/send-batch-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dealerNumbers: doneDealers.map(d => d.dealerNo),
-          emailType: 'post_scheduled',
-        }),
-      });
+    let sentCount = 0;
+    let failedCount = 0;
 
-      const data = await response.json();
+    // Process one dealer at a time to avoid serverless timeout
+    for (let i = 0; i < doneDealers.length; i++) {
+      const dealer = doneDealers[i];
+      setEmailProgress({ sent: sentCount, total: doneDealers.length, current: dealer.displayName });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send emails');
+      try {
+        const response = await fetch('/api/admin/send-batch-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dealerNumbers: [dealer.dealerNo],
+            emailType: 'post_scheduled',
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.sent > 0) {
+          sentCount++;
+        } else {
+          failedCount++;
+        }
+      } catch {
+        failedCount++;
       }
 
+      setEmailProgress({ sent: sentCount, total: doneDealers.length, current: '' });
+
+      // Rate limit: Wait 600ms between emails to stay under Resend's 2 req/sec limit
+      if (i < doneDealers.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+    }
+
+    setEmailProgress(null);
+    setSendingEmails(false);
+
+    if (sentCount > 0) {
       setEmailResult({
         success: true,
-        message: data.message || 'Emails sent successfully',
-        sent: data.sent,
+        message: `Sent ${sentCount} of ${doneDealers.length} emails${failedCount > 0 ? ` (${failedCount} failed)` : ''}`,
+        sent: sentCount,
       });
-
       // Refresh status after sending emails
       fetchSpreadsheetStatus();
-    } catch (error) {
-      setEmailResult({ success: false, message: error instanceof Error ? error.message : 'Failed to send emails' });
-    } finally {
-      setSendingEmails(false);
+    } else {
+      setEmailResult({
+        success: false,
+        message: `Failed to send emails (${failedCount} errors)`,
+      });
     }
   };
 
@@ -438,7 +478,10 @@ export default function PostsPage() {
                   className="w-full px-6 py-3 bg-[#5378a8] text-white rounded-lg hover:bg-[#4a6890] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors flex items-center justify-center gap-2"
                 >
                   {sendingEmails ? (
-                    <>Sending Emails...</>
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Sending {emailProgress?.sent || 0} of {emailProgress?.total || statusCounts['Done']}...
+                    </>
                   ) : (
                     <>
                       Send Emails to {statusCounts['Done']} Done Dealers
@@ -446,7 +489,26 @@ export default function PostsPage() {
                   )}
                 </button>
 
-                {emailResult && (
+                {/* Progress bar during sending */}
+                {sendingEmails && emailProgress && (
+                  <div className="mt-3 p-4 bg-blue-50 border border-blue-300 rounded-lg">
+                    <div className="flex justify-between text-sm text-blue-800 mb-2">
+                      <span>Sending emails...</span>
+                      <span>{emailProgress.sent} / {emailProgress.total}</span>
+                    </div>
+                    <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(emailProgress.sent / emailProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    {emailProgress.current && (
+                      <p className="text-xs text-blue-600 mt-2">Currently: {emailProgress.current}</p>
+                    )}
+                  </div>
+                )}
+
+                {emailResult && !sendingEmails && (
                   <div
                     className={`mt-3 p-4 rounded-lg ${
                       emailResult.success
@@ -455,7 +517,6 @@ export default function PostsPage() {
                     }`}
                   >
                     {emailResult.success ? '✅' : '❌'} {emailResult.message}
-                    {emailResult.sent !== undefined && ` (${emailResult.sent} emails sent)`}
                   </div>
                 )}
               </div>
