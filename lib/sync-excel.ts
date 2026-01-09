@@ -7,12 +7,8 @@
 
 import { Client } from '@microsoft/microsoft-graph-client';
 import { ClientSecretCredential } from '@azure/identity';
-import Database from 'better-sqlite3';
-import path from 'path';
 import { createDealer, updateDealer, markDealerRemoved, getDealers } from './firestore-dealers';
 import type { FirestoreDealer } from './firestore-dealers';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 // Microsoft Azure credentials
 const TENANT_ID = process.env.MICROSOFT_TENANT_ID || '';
