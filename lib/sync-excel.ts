@@ -215,13 +215,33 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
 
     const fileId = fileResponse.id;
 
-    // Read the worksheet data using Excel API
-    // This reads the used range of the worksheet
-    const rangeResponse = await client
-      .api(`/drives/${driveId}/items/${fileId}/workbook/worksheets/${SHEET_NAME}/usedRange`)
-      .get();
+    // Download the file content as a buffer
+    // Note: We use /content endpoint instead of /workbook because Excel API
+    // doesn't support application permissions (requires delegated/user permissions)
+    const fileBuffer = await client
+      .api(`/drives/${driveId}/items/${fileId}/content`)
+      .getStream();
 
-    const rows = rangeResponse.values || [];
+    // Convert stream to buffer
+    const chunks: Buffer[] = [];
+    for await (const chunk of fileBuffer) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Parse Excel file using xlsx library
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+
+    // Find the worksheet
+    if (!workbook.SheetNames.includes(SHEET_NAME)) {
+      throw new Error(`Worksheet "${SHEET_NAME}" not found in Excel file. Available sheets: ${workbook.SheetNames.join(', ')}`);
+    }
+
+    const worksheet = workbook.Sheets[SHEET_NAME];
+
+    // Convert worksheet to array of arrays
+    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }) as any[][];
 
     if (rows.length < 2) {
       throw new Error('Excel file is empty or has no data rows');
@@ -239,7 +259,18 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
 
     return dealers;
   } catch (error) {
+    console.error('Excel sync error details:', error);
     if (error instanceof Error) {
+      // Try to extract more details from Graph API errors
+      const errorBody = (error as any).body;
+      if (errorBody) {
+        try {
+          const parsed = JSON.parse(errorBody);
+          throw new Error(`Failed to read Excel from SharePoint: ${error.message} - ${JSON.stringify(parsed)}`);
+        } catch {
+          throw new Error(`Failed to read Excel from SharePoint: ${error.message} - ${errorBody}`);
+        }
+      }
       throw new Error(`Failed to read Excel from SharePoint: ${error.message}`);
     }
     throw new Error('Failed to read Excel from SharePoint: Unknown error');

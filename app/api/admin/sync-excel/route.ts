@@ -161,8 +161,18 @@ function parseOutput(output: string): SyncResult['changes'] {
 // GET - Check for changes, auto-apply ALL changes, and send appropriate emails
 export async function GET() {
   try {
-    // First, do a dry run to see what changes exist
-    const { changes } = await syncFromExcel(false);
+    // Use Python script for local development (reads from WSL-mounted OneDrive)
+    // Note: TypeScript/Graph API version doesn't work due to Excel API permission limitations
+    const dryRunResult = await runPythonScript([]);
+
+    if (!dryRunResult.success) {
+      return NextResponse.json(
+        { success: false, error: dryRunResult.error || 'Sync failed' },
+        { status: 500 }
+      );
+    }
+
+    const changes = dryRunResult.changes || { new: [], removed: [], updated: [], unchanged: [] };
 
     const hasNewDealers = changes.new && changes.new.length > 0;
     const hasUpdates = changes.updated && changes.updated.length > 0;
@@ -170,8 +180,15 @@ export async function GET() {
 
     // If there are any changes, auto-apply them
     if (hasNewDealers || hasUpdates || hasRemovals) {
-      // Apply the changes
-      await syncFromExcel(true);
+      // Apply the changes using Python script
+      const applyResult = await runPythonScript(['--apply']);
+
+      if (!applyResult.success) {
+        return NextResponse.json(
+          { success: false, error: applyResult.error || 'Failed to apply changes' },
+          { status: 500 }
+        );
+      }
 
       const emailResults: Array<{ dealer_no: string; email_type: string; success: boolean; error?: string }> = [];
 
@@ -308,7 +325,17 @@ function wasPromotedToFull(dealer: { changes?: Array<{ field: string; old: strin
 // POST - Apply changes and send welcome emails to new dealers
 export async function POST() {
   try {
-    const { changes } = await syncFromExcel(true);
+    // Use Python script for local development
+    const result = await runPythonScript(['--apply']);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error || 'Sync failed' },
+        { status: 500 }
+      );
+    }
+
+    const changes = result.changes || { new: [], removed: [], updated: [], unchanged: [] };
 
     // If successful and there are new dealers, send welcome emails
     if (changes.new && changes.new.length > 0) {
