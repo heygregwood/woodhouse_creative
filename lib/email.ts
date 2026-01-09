@@ -106,7 +106,7 @@ export async function updateEmailStatus(dealerNo: string, status: string = 'Emai
       // Handle float formatting issues
       try {
         if (cellValue.includes('.') || cellValue.toUpperCase().includes('E')) {
-          cellValue = String(parseInt(parseFloat(cellValue)));
+          cellValue = String(Math.floor(parseFloat(cellValue)));
         }
       } catch {
         // Keep original

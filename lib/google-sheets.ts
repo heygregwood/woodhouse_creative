@@ -147,7 +147,7 @@ function findDealerColumn(rows: string[][], dealerNo: string): number {
     // Handle float formatting
     try {
       if (cellValue.includes('.') || cellValue.toUpperCase().includes('E')) {
-        cellValue = String(parseInt(parseFloat(cellValue)));
+        cellValue = String(Math.floor(parseFloat(cellValue)));
       }
     } catch {
       // Keep original

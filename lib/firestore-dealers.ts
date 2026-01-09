@@ -109,6 +109,7 @@ export async function getDealers(filter?: {
   program_status?: string;
   review_status?: string;
   ready_for_automate?: string;
+  logo_needs_design?: number;
 }): Promise<FirestoreDealer[]> {
   try {
     let query = db.collection(DEALERS_COLLECTION).orderBy('dealer_no');
@@ -121,6 +122,9 @@ export async function getDealers(filter?: {
     }
     if (filter?.ready_for_automate) {
       query = query.where('ready_for_automate', '==', filter.ready_for_automate) as any;
+    }
+    if (filter?.logo_needs_design !== undefined) {
+      query = query.where('logo_needs_design', '==', filter.logo_needs_design) as any;
     }
 
     const snapshot = await query.get();
