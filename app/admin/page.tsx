@@ -398,9 +398,7 @@ export default function CreativeAdminPage() {
                     <p className="text-sm text-black/70 mt-1">Check for new/changed dealers</p>
                   </div>
                   <a
-                    href="https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4?e=0MwJgK"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="ms-excel:ofe|u|https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4?e=0MwJgK"
                     className="text-xs px-2 py-1 bg-white/50 hover:bg-white/80 rounded text-black/70 hover:text-black transition-colors"
                   >
                     Open Excel
