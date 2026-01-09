@@ -62,7 +62,7 @@ interface FieldChange {
   new: string | null;
 }
 
-interface DealerChange {
+export interface DealerChange {
   dealer_no: string;
   dealer_name: string;
   program_status: string;
@@ -70,7 +70,7 @@ interface DealerChange {
   data?: ExcelRow;
 }
 
-interface SyncChanges {
+export interface SyncChanges {
   new: DealerChange[];
   removed: DealerChange[];
   updated: DealerChange[];
@@ -153,9 +153,13 @@ function parseExcelRow(row: any[]): ExcelRow | null {
     dealerNo = dealerNo.toString().trim();
   }
 
-  // Parse program status (treat NEW as CONTENT)
-  let programStatus = row[COLUMN_INDICES.program_status]?.toString().trim() || 'CONTENT';
-  if (programStatus === 'NEW') {
+  // Parse program status - normalize to FULL or CONTENT only
+  const rawStatus = row[COLUMN_INDICES.program_status]?.toString().trim().toUpperCase() || '';
+  let programStatus: string;
+  if (rawStatus === 'FULL') {
+    programStatus = 'FULL';
+  } else {
+    // Everything else (NEW, CONTENT, REMOVED, empty, etc.) becomes CONTENT
     programStatus = 'CONTENT';
   }
 

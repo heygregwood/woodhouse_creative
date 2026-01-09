@@ -7,6 +7,12 @@
  * Use case: Test accounts, internal accounts, dealers who have opted out
  */
 
+// Set to true to enable testing mode - ONLY test dealer(s) will receive emails
+export const TESTING_MODE = false;
+
+// Test dealer number - receives emails even in testing mode
+export const TEST_DEALER_NO = '99999999';
+
 export const BLOCKED_DEALER_NOS = new Set([
   // Test account - G W Berkheimer Co Inc GW BERKHEIMER - HQ TEST ACCOUNT
   '10491009',
@@ -14,8 +20,21 @@ export const BLOCKED_DEALER_NOS = new Set([
 
 /**
  * Check if a dealer should be blocked from receiving emails
+ *
+ * In TESTING_MODE:
+ * - Only TEST_DEALER_NO receives emails
+ * - All other dealers are blocked (return true)
+ *
+ * In normal mode:
+ * - Only dealers in BLOCKED_DEALER_NOS are blocked
  */
 export function isDealerBlocked(dealerNo: string): boolean {
+  if (TESTING_MODE) {
+    // In testing mode, only allow test dealer
+    return dealerNo !== TEST_DEALER_NO;
+  }
+
+  // Normal mode - check blocklist
   return BLOCKED_DEALER_NOS.has(dealerNo);
 }
 

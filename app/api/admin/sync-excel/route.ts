@@ -1,44 +1,28 @@
 /**
- * GET /api/admin/sync-excel - Preview changes from Excel
+ * GET /api/admin/sync-excel - Preview changes from Excel (auto-applies if changes found)
  * POST /api/admin/sync-excel - Apply changes from Excel
  *
  * Syncs dealers from Allied Excel file to SQLite database.
+ * Uses Microsoft Graph API to read Excel directly from SharePoint/OneDrive.
  * Detects new dealers, removed dealers, and field updates.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import { isDealerBlocked } from '@/lib/blocked-dealers';
-import { syncFromExcel } from '@/lib/sync-excel';
+import { syncFromExcel, type SyncChanges, type DealerChange } from '@/lib/sync-excel';
 
-const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'sync_from_excel.py');
-
-interface SyncResult {
-  success: boolean;
-  output: string;
-  changes?: {
-    new: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
-    removed: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
-    updated: Array<{ dealer_no: string; dealer_name: string; changes: string[] }>;
-    unchanged: number;
-  };
-  error?: string;
-}
-
-function runPythonScript(args: string[]): Promise<SyncResult> {
+// Send email to a dealer using Python script (will be migrated to TypeScript later)
+function sendEmail(dealerNo: string, emailType: 'welcome' | 'fb_admin_accepted'): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    const python = spawn('python3', [SCRIPT_PATH, ...args], {
+    const emailScript = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
+    const python = spawn('python3', [emailScript, emailType, dealerNo], {
       cwd: process.cwd(),
       env: { ...process.env },
     });
 
-    let stdout = '';
     let stderr = '';
-
-    python.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
 
     python.stderr.on('data', (data) => {
       stderr += data.toString();
@@ -46,133 +30,35 @@ function runPythonScript(args: string[]): Promise<SyncResult> {
 
     python.on('close', (code) => {
       if (code !== 0) {
-        resolve({
-          success: false,
-          output: stdout,
-          error: stderr || `Script exited with code ${code}`,
-        });
-        return;
+        resolve({ success: false, error: stderr || `Email script exited with code ${code}` });
+      } else {
+        resolve({ success: true });
       }
-
-      // Parse the output to extract change counts
-      const changes = parseOutput(stdout);
-      resolve({
-        success: true,
-        output: stdout,
-        changes,
-      });
     });
 
     python.on('error', (err) => {
-      resolve({
-        success: false,
-        output: '',
-        error: `Failed to run script: ${err.message}`,
-      });
+      // Python not available (e.g., on Vercel) - fail gracefully
+      resolve({ success: false, error: `Python not available: ${err.message}` });
     });
   });
 }
 
-function parseOutput(output: string): SyncResult['changes'] {
-  const changes: SyncResult['changes'] = {
-    new: [],
-    removed: [],
-    updated: [],
-    unchanged: 0,
-  };
-
-  // Parse NEW DEALERS section
-  const newMatch = output.match(/🆕 NEW DEALERS \((\d+)\):([\s\S]*?)(?=\n\n|❌|✏️|📊)/);
-  if (newMatch) {
-    const lines = newMatch[2].trim().split('\n');
-    for (const line of lines) {
-      const match = line.match(/(\d+)\s*-\s*(.+?)\s*\((\w+)\)/);
-      if (match) {
-        changes.new.push({
-          dealer_no: match[1],
-          dealer_name: match[2].trim(),
-          program_status: match[3],
-        });
-      }
-    }
-  }
-
-  // Parse REMOVED DEALERS section
-  const removedMatch = output.match(/❌ REMOVED DEALERS \((\d+)\):([\s\S]*?)(?=\n\n|✏️|📊)/);
-  if (removedMatch) {
-    const lines = removedMatch[2].trim().split('\n');
-    for (const line of lines) {
-      const match = line.match(/(\d+)\s*-\s*(.+?)\s*\((\w+)\)/);
-      if (match) {
-        changes.removed.push({
-          dealer_no: match[1],
-          dealer_name: match[2].trim(),
-          program_status: match[3],
-        });
-      }
-    }
-  }
-
-  // Parse UPDATED DEALERS section
-  const updatedMatch = output.match(/✏️\s*UPDATED DEALERS \((\d+)\):([\s\S]*?)(?=\n\n📊|\n📊)/);
-  if (updatedMatch) {
-    const section = updatedMatch[2].trim();
-    const lines = section.split('\n');
-
-    let currentDealer: { dealer_no: string; dealer_name: string; changes: string[] } | null = null;
-
-    for (const line of lines) {
-      // Check if this is a dealer line (starts with dealer number)
-      const dealerMatch = line.match(/^\s*(\d{8,})\s*-\s*(.+)/);
-      if (dealerMatch) {
-        // Save previous dealer if exists
-        if (currentDealer) {
-          changes.updated.push(currentDealer);
-        }
-        currentDealer = {
-          dealer_no: dealerMatch[1],
-          dealer_name: dealerMatch[2].trim(),
-          changes: [],
-        };
-      } else if (currentDealer && line.includes('→')) {
-        // This is a change line (e.g., "program_status: 'CONTENT' → 'FULL'")
-        const changeMatch = line.match(/^\s*(\w+):\s*'?([^']+)'?\s*→\s*'?([^']+)'?/);
-        if (changeMatch) {
-          currentDealer.changes.push(`${changeMatch[1]}: ${changeMatch[2]} → ${changeMatch[3]}`);
-        }
-      }
-    }
-
-    // Don't forget the last dealer
-    if (currentDealer) {
-      changes.updated.push(currentDealer);
-    }
-  }
-
-  // Parse unchanged count
-  const unchangedMatch = output.match(/Unchanged:\s*(\d+)/);
-  if (unchangedMatch) {
-    changes.unchanged = parseInt(unchangedMatch[1]);
-  }
-
-  return changes;
+// Helper to check if dealer was promoted to FULL (from CONTENT or NEW)
+function wasPromotedToFull(dealer: DealerChange): boolean {
+  if (!dealer.changes) return false;
+  return dealer.changes.some(change => {
+    return change.field === 'program_status' &&
+           change.new === 'FULL' &&
+           (change.old === 'CONTENT' || change.old === 'NEW' || !change.old);
+  });
 }
 
 // GET - Check for changes, auto-apply ALL changes, and send appropriate emails
 export async function GET() {
   try {
-    // Use Python script for local development (reads from WSL-mounted OneDrive)
-    // Note: TypeScript/Graph API version doesn't work due to Excel API permission limitations
-    const dryRunResult = await runPythonScript([]);
-
-    if (!dryRunResult.success) {
-      return NextResponse.json(
-        { success: false, error: dryRunResult.error || 'Sync failed' },
-        { status: 500 }
-      );
-    }
-
-    const changes = dryRunResult.changes || { new: [], removed: [], updated: [], unchanged: [] };
+    // Use TypeScript implementation with Microsoft Graph API
+    // This works on both localhost and Vercel production
+    const { changes } = await syncFromExcel(false); // Dry run first
 
     const hasNewDealers = changes.new && changes.new.length > 0;
     const hasUpdates = changes.updated && changes.updated.length > 0;
@@ -180,15 +66,8 @@ export async function GET() {
 
     // If there are any changes, auto-apply them
     if (hasNewDealers || hasUpdates || hasRemovals) {
-      // Apply the changes using Python script
-      const applyResult = await runPythonScript(['--apply']);
-
-      if (!applyResult.success) {
-        return NextResponse.json(
-          { success: false, error: applyResult.error || 'Failed to apply changes' },
-          { status: 500 }
-        );
-      }
+      // Apply the changes using TypeScript implementation
+      await syncFromExcel(true);
 
       const emailResults: Array<{ dealer_no: string; email_type: string; success: boolean; error?: string }> = [];
 
@@ -230,7 +109,12 @@ export async function GET() {
 
       return NextResponse.json({
         success: true,
-        changes,
+        changes: {
+          new: changes.new,
+          removed: changes.removed,
+          updated: changes.updated,
+          unchanged: changes.unchanged.length,
+        },
         autoApplied: true,
         emailsSent: emailResults.filter(r => r.success).length,
         emailsFailed: emailResults.filter(r => !r.success).length,
@@ -244,9 +128,22 @@ export async function GET() {
     // No changes - return the preview
     return NextResponse.json({
       success: true,
-      changes,
+      changes: {
+        new: changes.new,
+        removed: changes.removed,
+        updated: changes.updated,
+        unchanged: changes.unchanged.length,
+      },
+      autoApplied: false,
+      emailsSent: 0,
+      emailsFailed: 0,
+      emailResults: [],
+      pendingReviewCount: 0,
+      pendingReviewDealers: [],
+      blockedDealersSkipped: [],
     });
   } catch (error) {
+    console.error('[sync-excel] Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Sync failed' },
       { status: 500 }
@@ -254,94 +151,17 @@ export async function GET() {
   }
 }
 
-// Add dealer to scheduling spreadsheet
-async function addDealerToSpreadsheet(dealerNo: string): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const script = path.join(process.cwd(), 'scripts', 'add_dealer_to_spreadsheet.py');
-    const python = spawn('python3', [script, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stderr = '';
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Script exited with code ${code}` });
-      } else {
-        resolve({ success: true });
-      }
-    });
-
-    python.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
-}
-
-// Send email to a dealer
-async function sendEmail(dealerNo: string, emailType: 'welcome' | 'fb_admin_accepted'): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const emailScript = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
-    const python = spawn('python3', [emailScript, emailType, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stderr = '';
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Email script exited with code ${code}` });
-      } else {
-        resolve({ success: true });
-      }
-    });
-
-    python.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
-}
-
-// Helper to check if dealer was promoted to FULL (from CONTENT or NEW)
-function wasPromotedToFull(dealer: { changes?: Array<{ field: string; old: string | null; new: string | null }> }): boolean {
-  if (!dealer.changes) return false;
-  return dealer.changes.some(change => {
-    return change.field === 'program_status' &&
-           change.new === 'FULL' &&
-           (change.old === 'CONTENT' || change.old === 'NEW' || !change.old);
-  });
-}
-
 // POST - Apply changes and send welcome emails to new dealers
 export async function POST() {
   try {
-    // Use Python script for local development
-    const result = await runPythonScript(['--apply']);
+    // Use TypeScript implementation with Microsoft Graph API
+    const { changes } = await syncFromExcel(true); // Apply changes
 
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error || 'Sync failed' },
-        { status: 500 }
-      );
-    }
-
-    const changes = result.changes || { new: [], removed: [], updated: [], unchanged: [] };
+    const emailResults: Array<{ dealer_no: string; success: boolean; error?: string }> = [];
+    const blockedDealers: string[] = [];
 
     // If successful and there are new dealers, send welcome emails
     if (changes.new && changes.new.length > 0) {
-      const emailResults: Array<{ dealer_no: string; success: boolean; error?: string }> = [];
-      const blockedDealers: string[] = [];
-
       for (let i = 0; i < changes.new.length; i++) {
         const dealer = changes.new[i];
         // Skip blocked dealers (test accounts, etc.)
@@ -359,23 +179,23 @@ export async function POST() {
           await new Promise((resolve) => setTimeout(resolve, 600));
         }
       }
-
-      // Add email results to the response
-      return NextResponse.json({
-        success: true,
-        changes,
-        emailsSent: emailResults.filter(r => r.success).length,
-        emailsFailed: emailResults.filter(r => !r.success).length,
-        emailResults,
-        blockedDealersSkipped: blockedDealers,
-      });
     }
 
     return NextResponse.json({
       success: true,
-      changes,
+      changes: {
+        new: changes.new,
+        removed: changes.removed,
+        updated: changes.updated,
+        unchanged: changes.unchanged.length,
+      },
+      emailsSent: emailResults.filter(r => r.success).length,
+      emailsFailed: emailResults.filter(r => !r.success).length,
+      emailResults,
+      blockedDealersSkipped: blockedDealers,
     });
   } catch (error) {
+    console.error('[sync-excel] Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Sync failed' },
       { status: 500 }

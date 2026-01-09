@@ -26,7 +26,8 @@ function getApp(): App {
 function getDb(): Firestore {
   if (!firestore) {
     getApp(); // Ensure app is initialized
-    firestore = getFirestore();
+    // Use woodhouse-creative-db database (separate from woodhouse_social SaaS)
+    firestore = getFirestore('woodhouse-creative-db');
   }
   return firestore;
 }
