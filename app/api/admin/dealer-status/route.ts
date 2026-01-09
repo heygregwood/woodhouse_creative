@@ -11,11 +11,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
 import { google } from 'googleapis';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+import { getDealers, promoteToFull, demoteToContent, type FirestoreDealer } from '@/lib/firestore-dealers';
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
 const DEALERS_FOLDER_ID = '1QwyyE9Pq-p8u-TEz7B5nC-14BERpDPmv';
 const COL_DEALERS_START = 6;
@@ -55,30 +52,38 @@ function getGoogleAuth() {
   });
 }
 
-function findDealerByName(db: Database.Database, name: string): Dealer | null {
-  // Try exact match first
-  let dealer = db.prepare(`
-    SELECT dealer_no, display_name, dealer_name, program_status,
-           contact_first_name, contact_email, region,
-           creatomate_phone, creatomate_website
-    FROM dealers
-    WHERE LOWER(display_name) = LOWER(?)
-       OR LOWER(dealer_name) = LOWER(?)
-  `).get(name, name) as Dealer | undefined;
+async function findDealerByName(name: string): Promise<Dealer | null> {
+  // Get all dealers from Firestore
+  const allDealers = await getDealers();
+
+  // Try exact match first (case-insensitive)
+  const nameLower = name.toLowerCase();
+  let dealer = allDealers.find(d =>
+    d.display_name?.toLowerCase() === nameLower ||
+    d.dealer_name.toLowerCase() === nameLower
+  );
 
   if (!dealer) {
     // Try partial match
-    dealer = db.prepare(`
-      SELECT dealer_no, display_name, dealer_name, program_status,
-             contact_first_name, contact_email, region,
-             creatomate_phone, creatomate_website
-      FROM dealers
-      WHERE LOWER(display_name) LIKE LOWER(?)
-         OR LOWER(dealer_name) LIKE LOWER(?)
-    `).get(`%${name}%`, `%${name}%`) as Dealer | undefined;
+    dealer = allDealers.find(d =>
+      d.display_name?.toLowerCase().includes(nameLower) ||
+      d.dealer_name.toLowerCase().includes(nameLower)
+    );
   }
 
-  return dealer || null;
+  if (!dealer) return null;
+
+  return {
+    dealer_no: dealer.dealer_no,
+    display_name: dealer.display_name || dealer.dealer_name,
+    dealer_name: dealer.dealer_name,
+    program_status: dealer.program_status,
+    contact_first_name: dealer.contact_first_name || '',
+    contact_email: dealer.contact_email || '',
+    region: dealer.region || '',
+    creatomate_phone: dealer.creatomate_phone || '',
+    creatomate_website: dealer.creatomate_website || '',
+  };
 }
 
 async function addToSpreadsheet(dealer: Dealer, auth: ReturnType<typeof getGoogleAuth>) {
@@ -230,11 +235,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = new Database(DB_PATH);
-    const dealer = findDealerByName(db, dealer_name);
+    const dealer = await findDealerByName(dealer_name);
 
     if (!dealer) {
-      db.close();
       return NextResponse.json(
         { error: `Dealer not found: ${dealer_name}` },
         { status: 404 }
@@ -246,7 +249,6 @@ export async function POST(request: NextRequest) {
 
     if (action === 'promote') {
       if (dealer.program_status === 'FULL') {
-        db.close();
         return NextResponse.json({
           success: true,
           message: 'Dealer is already FULL status',
@@ -255,15 +257,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update database
-      db.prepare(`
-        UPDATE dealers
-        SET program_status = 'FULL',
-            needs_logo = 1,
-            updated_at = datetime('now')
-        WHERE dealer_no = ?
-      `).run(dealer.dealer_no);
-      results.push('Database updated to FULL');
+      // Update Firestore - promote to FULL with pending_review
+      await promoteToFull(dealer.dealer_no, true);
+      results.push('Firestore updated to FULL (pending_review)');
 
       // Create Drive folder
       const folderId = await createDriveFolder(dealer.display_name, auth);
@@ -276,7 +272,6 @@ export async function POST(request: NextRequest) {
     } else {
       // demote
       if (dealer.program_status === 'CONTENT') {
-        db.close();
         return NextResponse.json({
           success: true,
           message: 'Dealer is already CONTENT status',
@@ -285,21 +280,14 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update database
-      db.prepare(`
-        UPDATE dealers
-        SET program_status = 'CONTENT',
-            updated_at = datetime('now')
-        WHERE dealer_no = ?
-      `).run(dealer.dealer_no);
-      results.push('Database updated to CONTENT');
+      // Update Firestore
+      await demoteToContent(dealer.dealer_no);
+      results.push('Firestore updated to CONTENT');
 
       // Remove from spreadsheet
       const removed = await removeFromSpreadsheet(dealer.dealer_no, auth);
       results.push(removed ? 'Removed from spreadsheet' : 'Not found in spreadsheet');
     }
-
-    db.close();
 
     // Log the change
     console.log(`[dealer-status] ${action}: ${dealer.display_name} (${dealer.dealer_no}) - source: ${source || 'unknown'}`);

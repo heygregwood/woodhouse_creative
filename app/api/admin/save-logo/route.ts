@@ -1,11 +1,8 @@
 // POST /api/admin/save-logo - Download logo, convert to PNG, and save to Google Drive
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
 import { uploadToGoogleDrive } from '@/lib/google-drive';
+import { updateLogo } from '@/lib/firestore-dealers';
 import sharp from 'sharp';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 // Logos folder path within the shared drive
 const LOGOS_FOLDER_PATH = 'Creative Automation/Logos';
@@ -77,16 +74,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[SAVE-LOGO] Uploaded to Drive: ${uploadResult.webViewLink}`);
 
-    // Update database with new logo URL
-    const db = new Database(DB_PATH);
-    db.prepare(`
-      UPDATE dealers 
-      SET creatomate_logo = ?, logo_source = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE dealer_no = ?
-    `).run(uploadResult.webViewLink, logoSource, dealerNo);
-    db.close();
+    // Update Firestore with new logo URL
+    await updateLogo(dealerNo, uploadResult.webViewLink);
 
-    console.log(`[SAVE-LOGO] Database updated for ${dealerNo}`);
+    console.log(`[SAVE-LOGO] Firestore updated for ${dealerNo}`);
 
     return NextResponse.json({
       success: true,
