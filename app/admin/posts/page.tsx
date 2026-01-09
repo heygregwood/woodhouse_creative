@@ -383,17 +383,36 @@ export default function PostsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Post Workflow</h1>
-            <p className="text-[#d7e7fd] mt-1">Manage posts and dealer status</p>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold">Woodhouse Creative Admin</h1>
           </div>
-          <a
-            href="/admin"
-            className="px-4 py-2 bg-[#c87a3e] rounded-lg hover:bg-[#b36a35] transition-colors"
-          >
-            Back to Dashboard
-          </a>
+          <div className="flex gap-3">
+            <a
+              href="/admin"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
+            >
+              Dashboard
+            </a>
+            <a
+              href="/admin/posts"
+              className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium"
+            >
+              Posts
+            </a>
+            <a
+              href="/admin/email-templates"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
+            >
+              Email Templates
+            </a>
+            <a
+              href="/admin/dealer-review"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
+            >
+              Dealer Review
+            </a>
+          </div>
         </div>
       </div>
 

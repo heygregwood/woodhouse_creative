@@ -358,17 +358,22 @@ export default function CreativeAdminPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Woodhouse Creative Automation</h1>
-            <p className="text-[#d7e7fd] mt-1">124 FULL dealers ready for automation</p>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold">Woodhouse Creative Admin</h1>
           </div>
           <div className="flex gap-3">
             <a
-              href="/admin/posts"
-              className="px-4 py-2 bg-[#c87a3e] rounded-lg hover:bg-[#b36a35] transition-colors font-medium"
+              href="/admin"
+              className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium"
             >
-              Post Workflow
+              Dashboard
+            </a>
+            <a
+              href="/admin/posts"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
+            >
+              Posts
             </a>
             <a
               href="/admin/email-templates"
@@ -378,7 +383,7 @@ export default function CreativeAdminPage() {
             </a>
             <a
               href="/admin/dealer-review"
-              className="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-lg hover:bg-yellow-300 transition-colors font-medium"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
             >
               Dealer Review
             </a>
