@@ -9,6 +9,8 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { ClientSecretCredential } from '@azure/identity';
 import Database from 'better-sqlite3';
 import path from 'path';
+import { createDealer, updateDealer, markDealerRemoved, getDealers } from './firestore-dealers';
+import type { FirestoreDealer } from './firestore-dealers';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
@@ -281,16 +283,14 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
   }
 }
 
-export function readDatabaseDealers(): Map<string, any> {
-  const db = new Database(DB_PATH, { readonly: true });
+export async function readDatabaseDealers(): Promise<Map<string, any>> {
   const dealers = new Map<string, any>();
 
-  const rows = db.prepare('SELECT * FROM dealers').all();
-  for (const row of rows) {
-    dealers.set((row as any).dealer_no, row);
+  const firestoreDealers = await getDealers();
+  for (const dealer of firestoreDealers) {
+    dealers.set(dealer.dealer_no, dealer);
   }
 
-  db.close();
   return dealers;
 }
 
@@ -370,38 +370,58 @@ export function compareDealers(excelDealers: Map<string, ExcelRow>, dbDealers: M
   return changes;
 }
 
-export function applyChanges(changes: SyncChanges): void {
-  const db = new Database(DB_PATH);
-  const now = new Date().toISOString();
-
+export async function applyChanges(changes: SyncChanges): Promise<void> {
   try {
-    // Insert new dealers
-    const insertStmt = db.prepare(`
-      INSERT INTO dealers (
-        dealer_no, dealer_name, program_status, source,
-        first_post_date, date_added, distributor_name, allied_status,
-        armstrong_air, airease, tier, turnkey_phone, turnkey_url, turnkey_email,
-        contact_name, contact_first_name, contact_email, contact_phone, contact_admin_email,
-        dealer_address, dealer_city, dealer_state, dealer_web_address,
-        registration_date, renew_date, note, has_sprout_excel, bad_email,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
+    // Insert new dealers into Firestore
     for (const dealer of changes.new) {
       const data = dealer.data!;
-      insertStmt.run(
-        data.dealer_no, data.dealer_name, data.program_status, data.source,
-        data.first_post_date, data.date_added, data.distributor_name, data.allied_status,
-        data.armstrong_air, data.airease, data.tier, data.turnkey_phone, data.turnkey_url, data.turnkey_email,
-        data.contact_name, data.contact_first_name, data.contact_email, data.contact_phone, data.contact_admin_email,
-        data.dealer_address, data.dealer_city, data.dealer_state, data.dealer_web_address,
-        data.registration_date, data.renew_date, data.note, data.has_sprout_excel, data.bad_email,
-        now, now
-      );
+
+      const newDealer: Omit<FirestoreDealer, 'created_at' | 'updated_at'> = {
+        dealer_no: data.dealer_no,
+        dealer_name: data.dealer_name,
+        display_name: null,
+        program_status: data.program_status,
+        source: data.source,
+        contact_name: data.contact_name || null,
+        contact_first_name: data.contact_first_name || null,
+        contact_email: data.contact_email || null,
+        contact_phone: data.contact_phone || null,
+        contact_admin_email: data.contact_admin_email || null,
+        first_post_date: data.first_post_date || null,
+        date_added: data.date_added || null,
+        registration_date: data.registration_date || null,
+        renew_date: data.renew_date || null,
+        dealer_address: data.dealer_address || null,
+        dealer_city: data.dealer_city || null,
+        dealer_state: data.dealer_state || null,
+        dealer_web_address: data.dealer_web_address || null,
+        region: null,
+        distributor_name: data.distributor_name || null,
+        allied_status: data.allied_status || null,
+        armstrong_air: data.armstrong_air,
+        airease: data.airease,
+        tier: data.tier || null,
+        creatomate_phone: null,
+        creatomate_website: null,
+        creatomate_logo: null,
+        turnkey_phone: data.turnkey_phone || null,
+        turnkey_url: data.turnkey_url || null,
+        turnkey_email: data.turnkey_email || null,
+        has_sprout_excel: data.has_sprout_excel,
+        bad_email: data.bad_email,
+        ready_for_automate: null,
+        logo_needs_design: null,
+        review_status: null,
+        facebook_page_id: null,
+        first_post_email_sent: null,
+        last_post_email_sent: null,
+        note: data.note || null,
+      };
+
+      await createDealer(newDealer);
     }
 
-    // Update existing dealers
+    // Update existing dealers in Firestore
     for (const dealer of changes.updated) {
       const data = dealer.data!;
 
@@ -410,51 +430,56 @@ export function applyChanges(changes: SyncChanges): void {
         (c) => c.field === 'program_status' && c.new === 'FULL' && (c.old === 'CONTENT' || c.old === 'NEW' || !c.old)
       );
 
-      const updateStmt = db.prepare(`
-        UPDATE dealers SET
-          dealer_name = ?, program_status = ?, source = ?,
-          first_post_date = ?, date_added = ?, distributor_name = ?, allied_status = ?,
-          armstrong_air = ?, airease = ?, tier = ?, turnkey_phone = ?, turnkey_url = ?, turnkey_email = ?,
-          contact_name = ?, contact_first_name = ?, contact_email = ?, contact_phone = ?, contact_admin_email = ?,
-          dealer_address = ?, dealer_city = ?, dealer_state = ?, dealer_web_address = ?,
-          registration_date = ?, renew_date = ?, note = ?, has_sprout_excel = ?, bad_email = ?,
-          review_status = ?, updated_at = ?
-        WHERE dealer_no = ?
-      `);
+      const updates: Partial<Omit<FirestoreDealer, 'dealer_no' | 'created_at' | 'updated_at'>> = {
+        dealer_name: data.dealer_name,
+        program_status: data.program_status,
+        source: data.source,
+        first_post_date: data.first_post_date || null,
+        date_added: data.date_added || null,
+        distributor_name: data.distributor_name || null,
+        allied_status: data.allied_status || null,
+        armstrong_air: data.armstrong_air,
+        airease: data.airease,
+        tier: data.tier || null,
+        turnkey_phone: data.turnkey_phone || null,
+        turnkey_url: data.turnkey_url || null,
+        turnkey_email: data.turnkey_email || null,
+        contact_name: data.contact_name || null,
+        contact_first_name: data.contact_first_name || null,
+        contact_email: data.contact_email || null,
+        contact_phone: data.contact_phone || null,
+        contact_admin_email: data.contact_admin_email || null,
+        dealer_address: data.dealer_address || null,
+        dealer_city: data.dealer_city || null,
+        dealer_state: data.dealer_state || null,
+        dealer_web_address: data.dealer_web_address || null,
+        registration_date: data.registration_date || null,
+        renew_date: data.renew_date || null,
+        note: data.note || null,
+        has_sprout_excel: data.has_sprout_excel,
+        bad_email: data.bad_email,
+        review_status: isPromotionToFull ? 'pending_review' : null,
+      };
 
-      updateStmt.run(
-        data.dealer_name, data.program_status, data.source,
-        data.first_post_date, data.date_added, data.distributor_name, data.allied_status,
-        data.armstrong_air, data.airease, data.tier, data.turnkey_phone, data.turnkey_url, data.turnkey_email,
-        data.contact_name, data.contact_first_name, data.contact_email, data.contact_phone, data.contact_admin_email,
-        data.dealer_address, data.dealer_city, data.dealer_state, data.dealer_web_address,
-        data.registration_date, data.renew_date, data.note, data.has_sprout_excel, data.bad_email,
-        isPromotionToFull ? 'pending_review' : null,
-        now,
-        dealer.dealer_no
-      );
+      await updateDealer(dealer.dealer_no, updates);
     }
 
-    // Mark removed dealers
-    const removeStmt = db.prepare(`UPDATE dealers SET allied_status = 'REMOVED', updated_at = ? WHERE dealer_no = ?`);
+    // Mark removed dealers in Firestore
     for (const dealer of changes.removed) {
-      removeStmt.run(now, dealer.dealer_no);
+      await markDealerRemoved(dealer.dealer_no);
     }
-
-    db.close();
   } catch (error) {
-    db.close();
     throw error;
   }
 }
 
 export async function syncFromExcel(apply: boolean = false): Promise<{ changes: SyncChanges; applied: boolean }> {
   const excelDealers = await readExcelData();
-  const dbDealers = readDatabaseDealers();
+  const dbDealers = await readDatabaseDealers();
   const changes = compareDealers(excelDealers, dbDealers);
 
   if (apply) {
-    applyChanges(changes);
+    await applyChanges(changes);
   }
 
   return { changes, applied: apply };

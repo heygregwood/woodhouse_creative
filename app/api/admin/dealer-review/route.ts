@@ -8,11 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
-import { spawn } from 'child_process';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+import { getDealers, approveDealer, type FirestoreDealer } from '@/lib/firestore-dealers';
+import { addDealerToSpreadsheet } from '@/lib/google-sheets';
+import { sendFbAdminAcceptedEmail } from '@/lib/email';
 
 interface DealerReview {
   dealer_no: string;
@@ -36,32 +34,7 @@ interface DealerReview {
 // GET - List dealers pending review
 export async function GET() {
   try {
-    const db = new Database(DB_PATH);
-
-    const dealers = db.prepare(`
-      SELECT
-        dealer_no,
-        dealer_name,
-        display_name,
-        distributor_name,
-        contact_name,
-        contact_first_name,
-        contact_email,
-        turnkey_phone,
-        dealer_web_address,
-        creatomate_phone,
-        creatomate_website,
-        creatomate_logo,
-        region,
-        program_status,
-        review_status,
-        updated_at
-      FROM dealers
-      WHERE review_status = 'pending_review'
-      ORDER BY updated_at DESC
-    `).all() as DealerReview[];
-
-    db.close();
+    const dealers = await getDealers({ review_status: 'pending_review' });
 
     return NextResponse.json({
       success: true,
@@ -106,37 +79,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = new Database(DB_PATH);
-
-    // Update dealer with validated fields
-    const now = new Date().toISOString();
-    db.prepare(`
-      UPDATE dealers
-      SET
-        display_name = ?,
-        creatomate_phone = ?,
-        creatomate_website = ?,
-        creatomate_logo = ?,
-        region = COALESCE(?, region),
-        review_status = 'approved',
-        ready_for_automate = 'yes',
-        updated_at = ?
-      WHERE dealer_no = ?
-    `).run(display_name, creatomate_phone, creatomate_website, creatomate_logo, region, now, dealer_no);
-
-    db.close();
+    // Update dealer in Firestore with validated fields
+    await approveDealer(dealer_no, {
+      display_name,
+      creatomate_phone,
+      creatomate_website,
+      creatomate_logo,
+      region,
+    });
 
     // Add dealer to scheduling spreadsheet
     const spreadsheetResult = await addDealerToSpreadsheet(dealer_no);
 
     // Send FB Admin Accepted email
-    const emailResult = await sendEmail(dealer_no, 'fb_admin_accepted');
+    const emailResult = await sendFbAdminAcceptedEmail(dealer_no);
 
     return NextResponse.json({
       success: true,
       dealer_no,
       spreadsheet: spreadsheetResult,
-      email: emailResult,
+      email: {
+        success: emailResult.success,
+        error: emailResult.error,
+      },
     });
   } catch (error) {
     return NextResponse.json(
@@ -144,70 +109,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Add dealer to scheduling spreadsheet
-async function addDealerToSpreadsheet(dealerNo: string): Promise<{ success: boolean; error?: string; output?: string }> {
-  return new Promise((resolve) => {
-    const script = path.join(process.cwd(), 'scripts', 'add_dealer_to_spreadsheet.py');
-    const python = spawn('python3', [script, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    python.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      console.log(`add_dealer_to_spreadsheet for ${dealerNo} - exit code: ${code}`);
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Script exited with code ${code}`, output: stdout });
-      } else {
-        resolve({ success: true, output: stdout });
-      }
-    });
-
-    python.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
-}
-
-// Send email to a dealer
-async function sendEmail(dealerNo: string, emailType: string): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const emailScript = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
-    const python = spawn('python3', [emailScript, emailType, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stderr = '';
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Email script exited with code ${code}` });
-      } else {
-        resolve({ success: true });
-      }
-    });
-
-    python.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
 }

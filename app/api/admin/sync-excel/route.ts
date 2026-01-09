@@ -8,39 +8,31 @@
  */
 
 import { NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 import { isDealerBlocked } from '@/lib/blocked-dealers';
 import { syncFromExcel, type SyncChanges, type DealerChange } from '@/lib/sync-excel';
+import { sendWelcomeEmail, sendFbAdminAcceptedEmail, type EmailResult } from '@/lib/email';
 
-// Send email to a dealer using Python script (will be migrated to TypeScript later)
-function sendEmail(dealerNo: string, emailType: 'welcome' | 'fb_admin_accepted'): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const emailScript = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
-    const python = spawn('python3', [emailScript, emailType, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
+// Send email to a dealer using TypeScript email module
+async function sendEmail(dealerNo: string, emailType: 'welcome' | 'fb_admin_accepted'): Promise<{ success: boolean; error?: string }> {
+  try {
+    let result: EmailResult;
+    if (emailType === 'welcome') {
+      result = await sendWelcomeEmail(dealerNo);
+    } else {
+      result = await sendFbAdminAcceptedEmail(dealerNo);
+    }
 
-    let stderr = '';
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Email script exited with code ${code}` });
-      } else {
-        resolve({ success: true });
-      }
-    });
-
-    python.on('error', (err) => {
-      // Python not available (e.g., on Vercel) - fail gracefully
-      resolve({ success: false, error: `Python not available: ${err.message}` });
-    });
-  });
+    if (result.success) {
+      return { success: true };
+    } else {
+      return { success: false, error: result.error };
+    }
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Email failed',
+    };
+  }
 }
 
 // Helper to check if dealer was promoted to FULL (from CONTENT or NEW)

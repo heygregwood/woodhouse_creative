@@ -9,11 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import Database from 'better-sqlite3';
-import path from 'path';
-import { spawn } from 'child_process';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+import { getDealer, updateEmailTimestamp } from '@/lib/firestore-dealers';
+import { sendFirstPostScheduledEmail, sendPostScheduledEmail, type EmailResult } from '@/lib/email';
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
 
 // Row indices (0-based for array access)
@@ -81,9 +78,6 @@ export async function GET() {
     const firstNameRow = rows[ROW_FIRST_NAME] || [];
     const emailRow = rows[ROW_EMAIL] || [];
 
-    // Get database to check first_post_email_sent
-    const db = new Database(DB_PATH, { readonly: true });
-
     // Find dealers with "Done" status
     const doneDealers: DoneDealer[] = [];
 
@@ -106,11 +100,8 @@ export async function GET() {
         const email = String(emailRow[col] || '').trim();
 
         if (dealerNo && email) {
-          // Check database for first_post_email_sent
-          const dealer = db.prepare(
-            'SELECT first_post_email_sent FROM dealers WHERE dealer_no = ?'
-          ).get(dealerNo) as { first_post_email_sent: string | null } | undefined;
-
+          // Check Firestore for first_post_email_sent
+          const dealer = await getDealer(dealerNo);
           const hasReceivedFirstPost = !!dealer?.first_post_email_sent;
 
           doneDealers.push({
@@ -125,8 +116,6 @@ export async function GET() {
         }
       }
     }
-
-    db.close();
 
     return NextResponse.json({
       success: true,
@@ -160,8 +149,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send email using Python script
-    const emailResult = await sendEmail(dealer_no, email_type);
+    // Send email using TypeScript email module
+    let emailResult: EmailResult;
+    if (email_type === 'first_post') {
+      emailResult = await sendFirstPostScheduledEmail(dealer_no);
+    } else {
+      emailResult = await sendPostScheduledEmail(dealer_no);
+    }
 
     if (!emailResult.success) {
       return NextResponse.json({
@@ -170,26 +164,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Update database to track first_post_email_sent
-    if (email_type === 'first_post') {
-      const db = new Database(DB_PATH);
-      const now = new Date().toISOString();
-      db.prepare(`
-        UPDATE dealers
-        SET first_post_email_sent = ?, last_post_email_sent = ?, updated_at = ?
-        WHERE dealer_no = ?
-      `).run(now, now, now, dealer_no);
-      db.close();
-    } else {
-      const db = new Database(DB_PATH);
-      const now = new Date().toISOString();
-      db.prepare(`
-        UPDATE dealers
-        SET last_post_email_sent = ?, updated_at = ?
-        WHERE dealer_no = ?
-      `).run(now, now, dealer_no);
-      db.close();
-    }
+    // Update Firestore to track email timestamps
+    await updateEmailTimestamp(dealer_no, email_type);
 
     return NextResponse.json({
       success: true,
@@ -204,42 +180,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Send email using Python script
-function sendEmail(dealerNo: string, emailType: 'first_post' | 'post_scheduled'): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const emailScript = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
-    const python = spawn('python3', [emailScript, emailType, dealerNo], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    python.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      console.log(`send_email for ${dealerNo} (${emailType}) - exit code: ${code}`);
-      console.log(`stdout: ${stdout}`);
-      if (stderr) console.log(`stderr: ${stderr}`);
-
-      if (code !== 0) {
-        resolve({ success: false, error: stderr || `Script exited with code ${code}` });
-      } else {
-        resolve({ success: true });
-      }
-    });
-
-    python.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
 }

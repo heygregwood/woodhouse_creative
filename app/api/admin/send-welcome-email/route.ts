@@ -3,68 +3,12 @@
  *
  * Sends a welcome email to a new dealer.
  * Body: { dealerNo: string, dryRun?: boolean }
+ *
+ * Uses TypeScript email module (works on Vercel)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
-
-const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'email_sender', 'send_email.py');
-
-interface EmailResult {
-  success: boolean;
-  output: string;
-  error?: string;
-}
-
-function runEmailScript(dealerNo: string, dryRun: boolean): Promise<EmailResult> {
-  return new Promise((resolve) => {
-    const args = ['welcome', dealerNo];
-    if (dryRun) {
-      args.push('--dry-run');
-    }
-
-    const python = spawn('python3', [SCRIPT_PATH, ...args], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    python.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    python.on('close', (code) => {
-      if (code !== 0) {
-        resolve({
-          success: false,
-          output: stdout,
-          error: stderr || `Script exited with code ${code}`,
-        });
-        return;
-      }
-
-      resolve({
-        success: true,
-        output: stdout,
-      });
-    });
-
-    python.on('error', (err) => {
-      resolve({
-        success: false,
-        output: '',
-        error: `Failed to run script: ${err.message}`,
-      });
-    });
-  });
-}
+import { sendWelcomeEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,9 +22,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await runEmailScript(dealerNo, dryRun);
+    // Send welcome email using TypeScript module
+    const result = await sendWelcomeEmail(dealerNo);
+
     return NextResponse.json(result);
-  } catch (error) {
+  } catch (error: unknown) {
+    console.error('[send-welcome-email] Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to send email' },
       { status: 500 }
