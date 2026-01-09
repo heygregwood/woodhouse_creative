@@ -308,6 +308,7 @@ export async function approveDealer(
     creatomate_phone: string;
     creatomate_website: string;
     creatomate_logo: string;
+    region?: string | null;
   }
 ): Promise<void> {
   try {
