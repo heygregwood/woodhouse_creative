@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import { isDealerBlocked } from '@/lib/blocked-dealers';
+import { syncFromExcel } from '@/lib/sync-excel';
 
 const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'sync_from_excel.py');
 
@@ -161,36 +162,25 @@ function parseOutput(output: string): SyncResult['changes'] {
 export async function GET() {
   try {
     // First, do a dry run to see what changes exist
-    const previewResult = await runPythonScript([]);
+    const { changes } = await syncFromExcel(false);
 
-    if (!previewResult.success) {
-      return NextResponse.json(previewResult);
-    }
-
-    const hasNewDealers = previewResult.changes?.new && previewResult.changes.new.length > 0;
-    const hasUpdates = previewResult.changes?.updated && previewResult.changes.updated.length > 0;
-    const hasRemovals = previewResult.changes?.removed && previewResult.changes.removed.length > 0;
+    const hasNewDealers = changes.new && changes.new.length > 0;
+    const hasUpdates = changes.updated && changes.updated.length > 0;
+    const hasRemovals = changes.removed && changes.removed.length > 0;
 
     // If there are any changes, auto-apply them
     if (hasNewDealers || hasUpdates || hasRemovals) {
       // Apply the changes
-      const applyResult = await runPythonScript(['--apply']);
-
-      if (!applyResult.success) {
-        return NextResponse.json({
-          ...applyResult,
-          error: 'Failed to apply changes: ' + (applyResult.error || 'Unknown error'),
-        });
-      }
+      await syncFromExcel(true);
 
       const emailResults: Array<{ dealer_no: string; email_type: string; success: boolean; error?: string }> = [];
 
       // Send welcome emails to new dealers (skip blocked dealers)
       // Rate limited to stay under Resend's 2 req/sec limit
       const blockedDealers: string[] = [];
-      if (previewResult.changes?.new) {
-        for (let i = 0; i < previewResult.changes.new.length; i++) {
-          const dealer = previewResult.changes.new[i];
+      if (changes.new) {
+        for (let i = 0; i < changes.new.length; i++) {
+          const dealer = changes.new[i];
           // Skip blocked dealers (test accounts, etc.)
           if (isDealerBlocked(dealer.dealer_no)) {
             blockedDealers.push(dealer.dealer_no);
@@ -203,7 +193,7 @@ export async function GET() {
             ...emailResult,
           });
           // Wait 600ms between emails to stay under 2 req/sec limit
-          if (i < previewResult.changes.new.length - 1) {
+          if (i < changes.new.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 600));
           }
         }
@@ -211,8 +201,8 @@ export async function GET() {
 
       // Count dealers promoted to FULL - they need manual review before spreadsheet/email
       const pendingReviewDealers: string[] = [];
-      if (previewResult.changes?.updated) {
-        for (const dealer of previewResult.changes.updated) {
+      if (changes.updated) {
+        for (const dealer of changes.updated) {
           if (wasPromotedToFull(dealer)) {
             // Don't auto-add to spreadsheet or send email
             // These dealers are now marked as pending_review in the database
@@ -223,8 +213,7 @@ export async function GET() {
 
       return NextResponse.json({
         success: true,
-        output: applyResult.output,
-        changes: previewResult.changes,
+        changes,
         autoApplied: true,
         emailsSent: emailResults.filter(r => r.success).length,
         emailsFailed: emailResults.filter(r => !r.success).length,
@@ -236,7 +225,10 @@ export async function GET() {
     }
 
     // No changes - return the preview
-    return NextResponse.json(previewResult);
+    return NextResponse.json({
+      success: true,
+      changes,
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Sync failed' },
@@ -304,30 +296,27 @@ async function sendEmail(dealerNo: string, emailType: 'welcome' | 'fb_admin_acce
 }
 
 // Helper to check if dealer was promoted to FULL (from CONTENT or NEW)
-function wasPromotedToFull(dealer: { changes: string[] }): boolean {
+function wasPromotedToFull(dealer: { changes?: Array<{ field: string; old: string | null; new: string | null }> }): boolean {
+  if (!dealer.changes) return false;
   return dealer.changes.some(change => {
-    if (!change.includes('program_status') || !change.includes('FULL')) {
-      return false;
-    }
-    // Check if changing FROM CONTENT or NEW TO FULL
-    const fromContent = change.includes('CONTENT') && change.indexOf('CONTENT') < change.indexOf('FULL');
-    const fromNew = change.includes('NEW') && change.indexOf('NEW') < change.indexOf('FULL');
-    return fromContent || fromNew;
+    return change.field === 'program_status' &&
+           change.new === 'FULL' &&
+           (change.old === 'CONTENT' || change.old === 'NEW' || !change.old);
   });
 }
 
 // POST - Apply changes and send welcome emails to new dealers
 export async function POST() {
   try {
-    const result = await runPythonScript(['--apply']);
+    const { changes } = await syncFromExcel(true);
 
     // If successful and there are new dealers, send welcome emails
-    if (result.success && result.changes?.new && result.changes.new.length > 0) {
+    if (changes.new && changes.new.length > 0) {
       const emailResults: Array<{ dealer_no: string; success: boolean; error?: string }> = [];
       const blockedDealers: string[] = [];
 
-      for (let i = 0; i < result.changes.new.length; i++) {
-        const dealer = result.changes.new[i];
+      for (let i = 0; i < changes.new.length; i++) {
+        const dealer = changes.new[i];
         // Skip blocked dealers (test accounts, etc.)
         if (isDealerBlocked(dealer.dealer_no)) {
           blockedDealers.push(dealer.dealer_no);
@@ -339,14 +328,15 @@ export async function POST() {
           ...emailResult,
         });
         // Wait 600ms between emails to stay under 2 req/sec limit
-        if (i < result.changes.new.length - 1) {
+        if (i < changes.new.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 600));
         }
       }
 
       // Add email results to the response
       return NextResponse.json({
-        ...result,
+        success: true,
+        changes,
         emailsSent: emailResults.filter(r => r.success).length,
         emailsFailed: emailResults.filter(r => !r.success).length,
         emailResults,
@@ -354,7 +344,10 @@ export async function POST() {
       });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      changes,
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Sync failed' },
