@@ -1,18 +1,28 @@
 /**
  * TypeScript implementation of Excel sync functionality
  * Replaces Python script sync_from_excel.py
+ *
+ * Uses Microsoft Graph API to read Excel file directly from SharePoint
  */
 
-import { google } from 'googleapis';
+import { Client } from '@microsoft/microsoft-graph-client';
+import { ClientSecretCredential } from '@azure/identity';
 import Database from 'better-sqlite3';
 import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
-// Allied Excel file on Google Drive (converted from SharePoint)
-// This file must be shared with the service account: creative-automation@woodhouse-social.iam.gserviceaccount.com
-// TODO: User needs to upload their Excel file to Google Drive and share it
-const EXCEL_FILE_ID = process.env.ALLIED_EXCEL_FILE_ID || '';
+// Microsoft Azure credentials
+const TENANT_ID = process.env.MICROSOFT_TENANT_ID || '';
+const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
+const CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
+
+// SharePoint file location
+// URL: https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4
+// This is a personal OneDrive URL (woodhouseagency-my.sharepoint.com)
+const SITE_HOST = 'woodhouseagency-my.sharepoint.com';
+const DRIVE_OWNER_EMAIL = process.env.SHAREPOINT_OWNER_EMAIL || 'greg@woodhouseagency.com';
+const FILE_PATH = process.env.SHAREPOINT_FILE_PATH || '/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm';
 const SHEET_NAME = 'Woodhouse Data';
 
 interface ExcelRow {
@@ -110,24 +120,25 @@ const TRACKED_FIELDS = [
   'allied_status',
 ];
 
-function getGoogleAuth() {
-  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  if (!serviceAccountEmail || !privateKey) {
-    throw new Error('Missing Google service account credentials');
+function getMicrosoftGraphClient(): Client {
+  if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error('Missing Microsoft Azure credentials. Set MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, and MICROSOFT_CLIENT_SECRET environment variables.');
   }
 
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: serviceAccountEmail,
-      private_key: privateKey,
+  // Create Azure AD credential using client secret
+  const credential = new ClientSecretCredential(TENANT_ID, CLIENT_ID, CLIENT_SECRET);
+
+  // Create Graph client with token credential authentication
+  const client = Client.initWithMiddleware({
+    authProvider: {
+      getAccessToken: async () => {
+        const token = await credential.getToken(['https://graph.microsoft.com/.default']);
+        return token?.token || '';
+      },
     },
-    scopes: [
-      'https://www.googleapis.com/auth/spreadsheets.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
-    ],
   });
+
+  return client;
 }
 
 function parseExcelRow(row: any[]): ExcelRow | null {
@@ -187,30 +198,52 @@ function parseExcelRow(row: any[]): ExcelRow | null {
 }
 
 export async function readExcelData(): Promise<Map<string, ExcelRow>> {
-  const auth = getGoogleAuth();
-  const sheets = google.sheets({ version: 'v4', auth });
+  const client = getMicrosoftGraphClient();
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: EXCEL_FILE_ID,
-    range: `${SHEET_NAME}!A:AB`, // Columns A through AB
-  });
+  try {
+    // Get the user's drive ID first
+    const userResponse = await client
+      .api(`/users/${DRIVE_OWNER_EMAIL}/drive`)
+      .get();
 
-  const rows = response.data.values || [];
-  if (rows.length < 2) {
-    throw new Error('Excel file is empty or has no data rows');
-  }
+    const driveId = userResponse.id;
 
-  const dealers = new Map<string, ExcelRow>();
+    // Get the file by path
+    const fileResponse = await client
+      .api(`/drives/${driveId}/root:${FILE_PATH}`)
+      .get();
 
-  // Skip header row (index 0)
-  for (let i = 1; i < rows.length; i++) {
-    const dealer = parseExcelRow(rows[i]);
-    if (dealer && dealer.dealer_no) {
-      dealers.set(dealer.dealer_no, dealer);
+    const fileId = fileResponse.id;
+
+    // Read the worksheet data using Excel API
+    // This reads the used range of the worksheet
+    const rangeResponse = await client
+      .api(`/drives/${driveId}/items/${fileId}/workbook/worksheets/${SHEET_NAME}/usedRange`)
+      .get();
+
+    const rows = rangeResponse.values || [];
+
+    if (rows.length < 2) {
+      throw new Error('Excel file is empty or has no data rows');
     }
-  }
 
-  return dealers;
+    const dealers = new Map<string, ExcelRow>();
+
+    // Skip header row (index 0)
+    for (let i = 1; i < rows.length; i++) {
+      const dealer = parseExcelRow(rows[i]);
+      if (dealer && dealer.dealer_no) {
+        dealers.set(dealer.dealer_no, dealer);
+      }
+    }
+
+    return dealers;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to read Excel from SharePoint: ${error.message}`);
+    }
+    throw new Error('Failed to read Excel from SharePoint: Unknown error');
+  }
 }
 
 export function readDatabaseDealers(): Map<string, any> {
