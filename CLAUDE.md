@@ -3,7 +3,240 @@
 **Purpose:** Internal creative automation for Woodhouse Agency Allied Air dealers
 **Status:** Active - 124 FULL dealers ready for automation
 **Deployed:** https://woodhouse-creative.vercel.app
-**Last Updated:** December 23, 2025
+**Last Updated:** January 9, 2026
+
+---
+
+## CRITICAL: Read This FIRST Before ANY Code Changes
+
+**MANDATORY WORKFLOW - NO EXCEPTIONS:**
+
+```
+1. Make code changes
+2. ASK USER: "Ready to test on localhost?" (default 3000, falls back to 3001 if taken)
+3. WAIT for user confirmation: "tests pass, push it"
+4. ONLY THEN: Commit and push to main
+5. Tell user: "Pushed to main - test on Preview (vercel.app)"
+6. User tests on Preview
+7. User manually deploys to production
+```
+
+**NEVER:**
+- Push without local testing confirmation
+- Push directly to production branch
+- Skip waiting for user "tests pass, push it" approval
+- Run `npm run build` without asking if dev server is running first
+- Start the dev server (`npm run dev`) - let Greg run it so he can Ctrl+C it
+
+This rule applies to ALL changes, even "small" ones.
+
+---
+
+## Documentation Updates - MANDATORY WORKFLOW
+
+When updating any documentation file (.md), follow this process:
+
+1. **Read the actual code file** to confirm current state
+2. **Read the doc file** to see what's currently documented
+3. **Compare and identify specific deltas** - what's missing, what's outdated, what's wrong
+4. **Make targeted edits** (not wholesale rewrites unless necessary)
+
+**NEVER:**
+- Update docs based on assumptions about what was built
+- Make wholesale rewrites without reading both code and doc first
+- Skip the comparison step
+
+This prevents docs from becoming stale because assumptions don't match reality.
+
+---
+
+## Development Workflow
+
+```
+LOCAL (localhost:3000) → PREVIEW (vercel.app) → PRODUCTION (woodhouse-creative.vercel.app)
+```
+
+| Step | Environment | URL | Branch |
+|------|-------------|-----|--------|
+| 1. Local | `npm run dev` | localhost:3000 | `main` |
+| 2. Preview | Push to `main` | woodhouse-creative.vercel.app | `main` |
+
+### Commands
+```bash
+# Push to Preview (Production)
+ga && git commit -m "message" && gpush
+```
+
+### Multi-Machine Workflow (Desktop + Laptop)
+
+**Desktop (Primary Development):**
+```bash
+# Normal development workflow
+npm run dev              # Test on localhost:3000
+ga && git commit -m "..." && gpush  # Push to Preview
+```
+
+**Laptop (Sync Only):**
+```bash
+# ONLY sync branches - DO NOT merge or push
+git checkout main
+git pull origin main
+```
+
+### Intermediate Commits During Sessions
+
+**YES - Commit frequently during large changes:**
+
+```bash
+# After each logical step/fix
+git add .
+git commit -m "Step 1: Implement X"
+git push
+
+# Continue working
+git add .
+git commit -m "Step 2: Add Y"
+git push
+```
+
+**Benefits:**
+- Rollback to any step if something breaks
+- Better git history showing progress
+- Session compaction won't lose work
+- Easier to test intermediate states
+
+**When to Commit:**
+- After each file/component is working
+- Before starting risky refactors
+- Every 30-60 minutes during long sessions
+- Before switching tasks
+
+---
+
+## Dev Environment
+
+- Windows 11 + WSL2 Ubuntu (8GB RAM limit via .wslconfig)
+- Username: `heygregwood`
+- Dev server: http://localhost:3000
+
+### WSL Memory Management (CRITICAL - Prevents Crashes)
+
+**Memory Limits:** WSL is configured with 8GB RAM + 4GB swap in `C:\Users\GregWood\.wslconfig`
+
+**BEFORE running `npm run build`:**
+1. **ASK GREG:** "Is the dev server running? I need to run a build."
+2. **WAIT** for Greg to stop the dev server (Ctrl+C)
+3. **THEN** run the build
+
+**NEVER** run `npm run build` while dev server is running - it WILL crash WSL.
+
+**If WSL crashes:** Run in PowerShell:
+```powershell
+wsl --shutdown
+wsl -d Ubuntu
+```
+
+**If builds are slow or crashing:** Clean the .next folder first:
+```bash
+rm -rf .next && npm run build
+```
+
+The `.next` folder can balloon to 1-2GB and cause memory issues. Delete it before builds if things get sluggish.
+
+### Build Command
+```bash
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
+```
+
+### Bash Aliases
+```bash
+gp        # git pull
+gs        # git status
+dev       # npm run dev
+gpush     # git push
+ga        # git add .
+```
+
+---
+
+## TypeScript & Coding Standards
+
+**These standards are MANDATORY for all new code.**
+
+### Type Safety
+
+**Never use `any`:**
+```typescript
+// BAD
+catch (error: any) {
+  setError(error.message);
+}
+
+// GOOD
+catch (error: unknown) {
+  setError(error instanceof Error ? error.message : 'Something went wrong');
+}
+```
+
+### Error Handling
+
+**API Routes - Standard pattern:**
+```typescript
+catch (error: unknown) {
+  console.error('[route-name] Error:', error);
+  return NextResponse.json(
+    { error: error instanceof Error ? error.message : 'Something went wrong' },
+    { status: 500 }
+  );
+}
+```
+
+**Client Components - Standard pattern:**
+```typescript
+catch (error: unknown) {
+  setError(error instanceof Error ? error.message : 'Something went wrong');
+}
+```
+
+### Logging
+
+**Use bracket prefix for context:**
+```typescript
+console.log('[sync-excel] Processing dealer:', dealerId);
+console.error('[batch-render] Error fetching reels:', error);
+```
+
+### API Response Format
+
+**Standard format (pick one per route type):**
+```typescript
+// Data endpoints - return data directly
+return NextResponse.json(dealer);
+
+// Write operations - include success flag
+return NextResponse.json({ success: true, id: newId });
+
+// Error responses - always use { error: string }
+return NextResponse.json({ error: 'Not found' }, { status: 404 });
+```
+
+### Import Organization
+
+**Order imports consistently:**
+```typescript
+// 1. React/Next.js
+import { useState } from 'react';
+import { NextRequest, NextResponse } from 'next/server';
+
+// 2. External packages
+import Database from 'better-sqlite3';
+
+// 3. Internal libs
+import { db } from '@/lib/firebase';
+
+// 4. Types (use 'import type' when possible)
+import type { Dealer } from '@/lib/types/dealer';
+```
 
 ---
 
@@ -146,7 +379,7 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 ## Admin Dashboard Pages
 
 ### `/admin` - Main Dashboard
-- **Excel Sync:** Preview/apply changes from Allied Excel
+- **Excel Sync:** Preview/apply changes from Allied Excel (**LOCAL ONLY** - works on localhost, not Vercel production)
 - **Batch Render:** Submit post number + template for rendering
 - **Populate Post Copy:** Enter base copy with variable picker, populate to all dealer columns
 - **Process Done Emails:** Send emails to dealers marked "Done" in spreadsheet
@@ -176,7 +409,7 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/dealers` | GET | Fetch dealers (filters: not-ready, no-logo, round2, all) |
-| `/sync-excel` | GET/POST | Preview/apply changes from Allied Excel |
+| `/sync-excel` | GET/POST | Preview/apply changes from Allied Excel (LOCAL ONLY - Python script) |
 | `/dealer-review` | GET/POST | List pending dealers / approve after review |
 | `/dealer-status` | POST | Update dealer CONTENT ↔ FULL (from Gmail webhook) |
 | `/process-done` | GET/POST | Get/send emails to dealers marked "Done" |
@@ -515,6 +748,66 @@ All validated for video generation:
 | `woodhouse_dealer_dashboard` | Static HTML performance reports |
 
 **Note:** This repo is for **agency operations** (existing Allied dealers). `woodhouse_social` is the **SaaS product** (new customers). They share the same Firebase project, Google Drive service account, and Creatomate API key.
+
+---
+
+## Excel Sync Limitations (Important)
+
+The "Sync from Excel" functionality works **LOCAL ONLY** and does **NOT** work on Vercel production.
+
+### Why Local Only?
+
+The Excel file is stored on SharePoint OneDrive at:
+```
+/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm
+```
+
+**Challenge:** The file contains VBA macros (FindNewDealers, PostProgramStatus) that are critical to the workflow and only work in desktop Excel.
+
+### What We Tried
+
+**Attempt 1: TypeScript + Microsoft Graph API**
+- Created Azure App Registration: "Woodhouse Creative Automation"
+- Added Files.Read.All and Sites.Read.All (application permissions)
+- Granted admin consent
+- Implemented [lib/sync-excel.ts](lib/sync-excel.ts) using `@microsoft/microsoft-graph-client`
+- **Result:** Failed - Excel API workbook endpoints require delegated permissions (user context), NOT supported with app-only authentication
+
+**Attempt 2: Download file with Graph API, parse with xlsx library**
+- Used `/drives/{id}/items/{fileId}/content` endpoint to download the Excel file
+- Used `xlsx` library to parse the downloaded file
+- **Result:** Failed - Same "General exception while processing" error, application permissions not sufficient
+
+### Current Solution
+
+The API route [app/api/admin/sync-excel/route.ts](app/api/admin/sync-excel/route.ts) uses Python script [scripts/sync_from_excel.py](scripts/sync_from_excel.py):
+- Works locally because Python reads from WSL-mounted OneDrive: `/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/...`
+- Spawns Python subprocess via Node.js `child_process.spawn`
+- **Limitation:** Python not available on Vercel serverless functions ("spawn python3 ENOENT")
+
+### Environment Variables
+
+Even though Graph API didn't work, the credentials are documented in [.env.example](.env.example):
+```env
+MICROSOFT_TENANT_ID=your-tenant-id
+MICROSOFT_CLIENT_ID=your-client-id
+MICROSOFT_CLIENT_SECRET=your-client-secret
+SHAREPOINT_OWNER_EMAIL=greg@woodhouseagency.com
+SHAREPOINT_FILE_PATH=/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm
+```
+
+### Using Sync from Excel
+
+**Works:** `http://localhost:3000/admin` - Click "Sync from Excel" button
+**Doesn't work:** `https://woodhouse-creative.vercel.app/admin` - Button will fail with error
+
+**Manual sync via terminal:**
+```bash
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+python3 scripts/sync_from_excel.py          # Dry run (preview changes)
+python3 scripts/sync_from_excel.py --apply  # Apply changes to database
+```
 
 ---
 
