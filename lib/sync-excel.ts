@@ -76,14 +76,15 @@ export interface SyncChanges {
 }
 
 // Column mapping: Excel column index -> field name
+// Based on actual Excel structure from header row
 const COLUMN_INDICES = {
-  dealer_no: 0,        // A: Dealer No
-  dealer_name: 1,      // B: Dealer Name
-  program_status: 2,   // C: Program Status
-  source: 3,           // D: Source
-  first_post_date: 4,  // E: First Post Date
-  date_added: 5,       // F: Date Added
-  distributor_name: 6, // G: Distributor Branch Name
+  program_status: 0,   // A: Program Status
+  first_post_date: 1,  // B: First Post Date
+  source: 2,           // C: Source
+  dealer_no: 3,        // D: Dealer No
+  date_added: 4,       // E: Date Added
+  distributor_name: 5, // F: Distributor Branch Name
+  dealer_name: 6,      // G: Dealer Name
   allied_status: 7,    // H: Status
   armstrong_air: 8,    // I: Armstrong Air
   airease: 9,          // J: AirEase
@@ -92,19 +93,19 @@ const COLUMN_INDICES = {
   turnkey_url: 12,     // M: TurnkeyURL
   turnkey_email: 13,   // N: TurnkeyEmail
   contact_name: 14,    // O: Contact Name
-  contact_first_name: 15, // P: Contact First Name
-  contact_email: 16,   // Q: Contact Email Address
-  contact_phone: 17,   // R: Contact Phone
-  contact_admin_email: 18, // S: Contact Admin Email Address
-  dealer_address: 19,  // T: Dealer Address
-  dealer_city: 20,     // U: Dealer City
-  dealer_state: 21,    // V: Dealer State
-  dealer_web_address: 22, // W: Dealer Web Address
-  registration_date: 23, // X: Registration Date
-  renew_date: 24,      // Y: Renew Date
-  note: 25,            // Z: NOTE
-  has_sprout_excel: 26, // AA: Sprout
-  bad_email: 27,       // AB: Bad Email
+  contact_email: 15,   // P: Contact Email Address
+  contact_phone: 16,   // Q: Contact Phone
+  contact_admin_email: 17, // R: Contact Admin Email Address
+  dealer_address: 18,  // S: Dealer Address
+  dealer_city: 19,     // T: Dealer City
+  dealer_state: 20,    // U: Dealer State
+  dealer_web_address: 21, // V: Dealer Web Address
+  registration_date: 22, // W: Registration Date
+  renew_date: 23,      // X: Renew Date
+  note: 24,            // Y: NOTE
+  has_sprout_excel: 25, // Z: Sprout
+  bad_email: 26,       // AA: Bad Email
+  contact_first_name: 27, // AB: Contact First Name
 };
 
 // Fields to track for changes
