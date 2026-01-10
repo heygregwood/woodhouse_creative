@@ -209,6 +209,8 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
       .get();
 
     const driveId = userResponse.id;
+    console.log('[sync-excel] Drive ID:', driveId);
+    console.log('[sync-excel] Drive owner:', DRIVE_OWNER_EMAIL);
 
     // Get the file by path
     const fileResponse = await client
@@ -216,6 +218,17 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
       .get();
 
     const fileId = fileResponse.id;
+    const fileName = fileResponse.name;
+    const fileSize = fileResponse.size;
+    const lastModified = fileResponse.lastModifiedDateTime;
+    const webUrl = fileResponse.webUrl;
+
+    console.log('[sync-excel] File found:');
+    console.log('[sync-excel]   Name:', fileName);
+    console.log('[sync-excel]   ID:', fileId);
+    console.log('[sync-excel]   Size:', fileSize, 'bytes');
+    console.log('[sync-excel]   Last modified:', lastModified);
+    console.log('[sync-excel]   Web URL:', webUrl);
 
     // Download the file content as a buffer
     // Note: We use /content endpoint instead of /workbook because Excel API
@@ -230,6 +243,7 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
       chunks.push(Buffer.from(chunk));
     }
     const buffer = Buffer.concat(chunks);
+    console.log('[sync-excel] Downloaded buffer size:', buffer.length, 'bytes');
 
     // Parse Excel file using xlsx library
     const XLSX = await import('xlsx');
@@ -245,6 +259,8 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
     // Convert worksheet to array of arrays
     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }) as any[][];
 
+    console.log('[sync-excel] Total rows in Excel (including header):', rows.length);
+
     if (rows.length < 2) {
       throw new Error('Excel file is empty or has no data rows');
     }
@@ -258,6 +274,13 @@ export async function readExcelData(): Promise<Map<string, ExcelRow>> {
         dealers.set(dealer.dealer_no, dealer);
       }
     }
+
+    console.log('[sync-excel] Parsed dealers:', dealers.size);
+
+    // Log first 5 and last 5 dealer numbers
+    const dealerNumbers = Array.from(dealers.keys()).sort();
+    console.log('[sync-excel] First 5 dealers:', dealerNumbers.slice(0, 5).join(', '));
+    console.log('[sync-excel] Last 5 dealers:', dealerNumbers.slice(-5).join(', '));
 
     return dealers;
   } catch (error) {
@@ -470,12 +493,29 @@ export async function applyChanges(changes: SyncChanges): Promise<void> {
 }
 
 export async function syncFromExcel(apply: boolean = false): Promise<{ changes: SyncChanges; applied: boolean }> {
+  console.log('[sync-excel] Starting sync, apply =', apply);
+
   const excelDealers = await readExcelData();
+  console.log('[sync-excel] Excel dealers loaded:', excelDealers.size);
+
   const dbDealers = await readDatabaseDealers();
+  console.log('[sync-excel] Database dealers loaded:', dbDealers.size);
+
   const changes = compareDealers(excelDealers, dbDealers);
+  console.log('[sync-excel] Comparison results:');
+  console.log('[sync-excel]   New:', changes.new.length);
+  console.log('[sync-excel]   Updated:', changes.updated.length);
+  console.log('[sync-excel]   Removed:', changes.removed.length);
+  console.log('[sync-excel]   Unchanged:', changes.unchanged.length);
+
+  if (changes.removed.length > 0) {
+    console.log('[sync-excel] Removed dealer numbers:', changes.removed.map(d => d.dealer_no).slice(0, 10).join(', '), '...');
+  }
 
   if (apply) {
+    console.log('[sync-excel] Applying changes...');
     await applyChanges(changes);
+    console.log('[sync-excel] Changes applied successfully');
   }
 
   return { changes, applied: apply };
