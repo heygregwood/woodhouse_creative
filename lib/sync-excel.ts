@@ -431,7 +431,8 @@ export async function applyChanges(changes: SyncChanges): Promise<void> {
         bad_email: data.bad_email,
         ready_for_automate: null,
         logo_needs_design: null,
-        review_status: null,
+        // New FULL dealers need manual review before onboarding
+        review_status: data.program_status === 'FULL' ? 'pending_review' : null,
         facebook_page_id: null,
         first_post_email_sent: null,
         last_post_email_sent: null,
