@@ -71,19 +71,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required fields
-    if (!display_name || !creatomate_phone || !creatomate_website || !creatomate_logo) {
+    // Validate required fields (website is optional)
+    if (!display_name || !creatomate_phone || !creatomate_logo) {
       return NextResponse.json(
-        { success: false, error: 'display_name, creatomate_phone, creatomate_website, and creatomate_logo are required' },
+        { success: false, error: 'display_name, creatomate_phone, and creatomate_logo are required (website is optional)' },
         { status: 400 }
       );
     }
 
-    // Update dealer in Firestore with validated fields
+    // Update dealer in Firestore with validated fields (website can be empty)
     await approveDealer(dealer_no, {
       display_name,
       creatomate_phone,
-      creatomate_website,
+      creatomate_website: creatomate_website || '',
       creatomate_logo,
       region,
     });

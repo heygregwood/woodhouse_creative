@@ -143,6 +143,71 @@ export async function getRenderStatus(renderId: string): Promise<{
 }
 
 /**
+ * List all templates from Creatomate
+ *
+ * @returns Array of templates with id and name
+ */
+export async function listTemplates(): Promise<Array<{ id: string; name: string }>> {
+  const apiKey = process.env.CREATOMATE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('CREATOMATE_API_KEY environment variable not set');
+  }
+
+  try {
+    const response = await fetch(`${CREATOMATE_API_BASE}/templates?limit=500`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Creatomate API error (${response.status}): ${errorText}`
+      );
+    }
+
+    const data = await response.json() as Array<{ id: string; name: string }>;
+
+    return data;
+  } catch (error) {
+    console.error('Error listing Creatomate templates:', error);
+    throw new Error(
+      `Failed to list templates: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get template ID for a post number
+ *
+ * @param postNumber - Post number (e.g., 666, 667, 668)
+ * @returns Template ID or null if not found
+ */
+export async function getTemplateIdByPostNumber(postNumber: number): Promise<string | null> {
+  const templates = await listTemplates();
+
+  // Search for template named with this post number
+  // Could be "666", "Post 666", "666 - Title", etc.
+  const postStr = postNumber.toString();
+  const template = templates.find(t => {
+    const nameLower = t.name.toLowerCase();
+    // Match exact post number in template name
+    return nameLower.includes(postStr);
+  });
+
+  if (!template) {
+    console.log(`[creatomate] Template not found for post ${postNumber}`);
+    console.log(`[creatomate] Available templates:`, templates.slice(0, 10).map(t => t.name));
+    return null;
+  }
+
+  console.log(`[creatomate] Found template "${template.name}" (${template.id}) for post ${postNumber}`);
+  return template.id;
+}
+
+/**
  * Verify Creatomate webhook signature
  *
  * @param signature - Signature from x-creatomate-signature header

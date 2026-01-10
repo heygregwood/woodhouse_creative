@@ -378,6 +378,42 @@ export async function archiveOldPosts(
 }
 
 /**
+ * Get shareable link for a file
+ *
+ * Sets file permissions to "anyone with link can view" and returns the shareable link
+ *
+ * @param fileId - Google Drive file ID
+ * @returns Shareable link or null if failed
+ */
+export async function getFileShareableLink(fileId: string): Promise<string | null> {
+  try {
+    const drive = getDriveClient();
+
+    // Set permissions to "anyone with link can view"
+    await drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+      supportsAllDrives: true,
+    });
+
+    // Get file metadata with webViewLink
+    const response = await drive.files.get({
+      fileId,
+      fields: 'webViewLink',
+      supportsAllDrives: true,
+    });
+
+    return response.data.webViewLink || null;
+  } catch (error) {
+    console.error('Error getting shareable link:', error);
+    return null;
+  }
+}
+
+/**
  * Test Google Drive connection
  *
  * @returns true if connection works

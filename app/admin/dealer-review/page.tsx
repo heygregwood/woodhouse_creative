@@ -214,10 +214,10 @@ export default function DealerReviewPage() {
 
   // Approve dealer
   const approveDealer = async (dealer: EditableDealer) => {
-    if (!dealer.edited_display_name || !dealer.edited_phone || !dealer.edited_website || !dealer.edited_logo) {
+    if (!dealer.edited_display_name || !dealer.edited_phone || !dealer.edited_logo) {
       setApproveResults((prev) => ({
         ...prev,
-        [dealer.dealer_no]: { success: false, message: 'All fields are required' },
+        [dealer.dealer_no]: { success: false, message: 'Display name, phone, and logo are required (website is optional)' },
       }));
       return;
     }

@@ -1,10 +1,8 @@
-// GET /api/admin/fetch-logos - Fetch logo options from Brandfetch + website scraping
+// GET /api/admin/fetch-logos - Fetch logo options from Brandfetch + website scraping + Facebook
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { db } from '@/lib/firebase';
 import * as cheerio from 'cheerio';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 const BRANDFETCH_API_KEY = process.env.BRANDFETCH_API_KEY;
 
 // Fallback dimensions to filter out
@@ -170,19 +168,24 @@ export async function GET(request: NextRequest) {
   const dealerNo = request.nextUrl.searchParams.get('dealerNo');
 
   let websiteUrl: string | null = null;
+  let facebookPageId: string | null = null;
 
   // If website is provided directly, use it
   if (websiteParam) {
     websiteUrl = websiteParam;
   }
-  // Otherwise look up by dealerNo
+  // Otherwise look up by dealerNo from Firestore
   else if (dealerNo) {
     try {
-      const db = new Database(DB_PATH, { readonly: true });
-      const dealer = db.prepare('SELECT creatomate_website, dealer_web_address FROM dealers WHERE dealer_no = ?').get(dealerNo) as { creatomate_website: string; dealer_web_address: string } | undefined;
-      db.close();
-      websiteUrl = dealer?.creatomate_website || dealer?.dealer_web_address || null;
-    } catch {
+      const dealerDoc = await db.collection('dealers').doc(dealerNo).get();
+      if (!dealerDoc.exists) {
+        return NextResponse.json({ error: 'Dealer not found', logos: [] }, { status: 404 });
+      }
+      const dealerData = dealerDoc.data();
+      websiteUrl = dealerData?.creatomate_website || dealerData?.dealer_web_address || null;
+      facebookPageId = dealerData?.facebook_page_id || null;
+    } catch (error) {
+      console.error('[fetch-logos] Error fetching dealer from Firestore:', error);
       return NextResponse.json({ error: 'Database error', logos: [] }, { status: 500 });
     }
   }
@@ -220,7 +223,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Website scraping
+    // 2. Facebook Page Profile Picture (if facebook_page_id exists)
+    if (facebookPageId) {
+      try {
+        // Public Graph API endpoint - no auth needed for profile pictures
+        const fbPictureUrl = `https://graph.facebook.com/${facebookPageId}/picture?height=1000&width=1000&type=large`;
+        const fbLogo = await fetchImageInfo(fbPictureUrl, 'facebook');
+        if (fbLogo) {
+          const key = `${fbLogo.width}x${fbLogo.height}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            results.push(fbLogo);
+            console.log(`[fetch-logos] Found Facebook profile picture (${fbLogo.width}x${fbLogo.height})`);
+          }
+        }
+      } catch (error) {
+        console.error('[fetch-logos] Failed to fetch Facebook profile picture:', error);
+      }
+    }
+
+    // 3. Website scraping
     const scraped = await scrapeWebsiteLogos(domain);
     for (const url of scraped.slice(0, 10)) {
       const info = await fetchImageInfo(url, 'website');
@@ -233,7 +255,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Google favicon
+    // 4. Google favicon
     const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=256`;
     const favicon = await fetchImageInfo(faviconUrl, 'favicon');
     if (favicon && favicon.width >= 128) {

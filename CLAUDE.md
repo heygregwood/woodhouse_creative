@@ -34,19 +34,47 @@ This rule applies to ALL changes, even "small" ones.
 
 ## Documentation Updates - MANDATORY WORKFLOW
 
-When updating any documentation file (.md), follow this process:
+**CRITICAL:** This workflow prevents documentation drift like the Excel sync bug (where column mapping docs didn't match code, causing 331 dealers to be incorrectly flagged as removed).
 
-1. **Read the actual code file** to confirm current state
-2. **Read the doc file** to see what's currently documented
-3. **Compare and identify specific deltas** - what's missing, what's outdated, what's wrong
-4. **Make targeted edits** (not wholesale rewrites unless necessary)
+### Before ANY commit touching data structures, databases, or column mappings:
+
+1. **Identify what changed:**
+   - Which code files were modified?
+   - Which data structures/schemas/mappings are affected?
+
+2. **Find corresponding docs:**
+   - Search `docs/` for references to the changed structure
+   - Check DATABASE.md, DATA_ARCHITECTURE.md, EXCEL_SYNC_REFERENCE.md, API docs
+   - Check CLAUDE.md for workflow/process changes
+
+3. **Read code → Read docs → Compare:**
+   - Read the ACTUAL code to see current state
+   - Read the ACTUAL docs to see what's documented
+   - Identify specific deltas (what's missing, outdated, wrong)
+
+4. **Make targeted edits:**
+   - Update docs with specific changes (not wholesale rewrites)
+   - Add verification date: `**Last Updated:** YYYY-MM-DD`
+   - Add code references with line numbers: `lib/sync-excel.ts:88`
+
+5. **Spot-check verification:**
+   - Pick a random value from code (e.g., column index 3)
+   - Find it in docs
+   - If not there or different: **FIX BEFORE COMMITTING**
+
+6. **Update CHANGELOG.md:**
+   - List exact files changed with line numbers
+   - Note data structure changes explicitly
+   - Format: `[YYYY-MM-DD] - [Feature Name]`
 
 **NEVER:**
 - Update docs based on assumptions about what was built
 - Make wholesale rewrites without reading both code and doc first
 - Skip the comparison step
+- Commit without updating CHANGELOG.md for data structure changes
 
-This prevents docs from becoming stale because assumptions don't match reality.
+**Example of what this prevents:**
+The Excel sync bug happened because column mapping changed from `dealer_no: 0` to `dealer_no: 3` in code, but docs weren't updated. This workflow would catch the mismatch in step 3.
 
 ---
 

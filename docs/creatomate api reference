@@ -1,0 +1,345 @@
+CREATOMATE API DOCUMENTATION
+Table of Contents
+
+Overview
+Quick Start Guide
+REST API Reference
+RenderScript
+Preview SDK
+Integration Methods
+Limits and Concurrency
+
+
+1. OVERVIEW
+Creatomate is a media automation platform that allows developers and businesses to generate videos, images, and GIFs programmatically. The platform offers multiple integration methods: a REST API for cloud-based rendering, a JSON-based format called RenderScript for flexible video design, and a Preview SDK for browser-based rendering.
+Key Features:
+
+Cloud-based video and image rendering
+REST API for programmatic access
+Browser-based preview SDK
+Template-based and code-based approaches
+No-code automation integrations (Zapier, Make.com, n8n, Pabbly)
+Support for dynamic and personalized content generation
+
+
+2. QUICK START GUIDE
+Getting Started with the API
+To create a video or image, you only need a single API request to the Creatomate endpoint.
+Authentication
+Every API request requires your project's API key, found in your Project Settings. Include it in the request header:
+Authorization: Bearer YOUR_API_KEY_HERE
+Method 1: Create a Video by Template
+Templates are pre-designed video structures created in the Creatomate editor that you can customize dynamically.
+Steps:
+
+Create a template in your account using the online editor
+Send an API request to modify template elements using the modifications parameter
+The API processes and returns your rendered video
+
+Example cURL Request:
+bashcurl -X POST https://api.creatomate.com/v2/renders \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \\
+  -d '{
+    "template_id": "YOUR_TEMPLATE_ID_HERE",
+    "modifications": {
+      "Primary-Text": "This text is placed in the video",
+      "Background-Video": "https://cdn.creatomate.com/demo/video1.mp4"
+    }
+  }'
+Modifying Template Attributes:
+Use dot notation to change specific properties:
+bashcurl -X POST https://api.creatomate.com/v2/renders \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \\
+  -d '{
+    "template_id": "YOUR_TEMPLATE_ID_HERE",
+    "modifications": {
+      "Primary-Text.font_family": "Montserrat",
+      "Secondary-Text.time": 4.53,
+      "Background-Color-2.fill_color": "#c3c615",
+      "Outro-Composition": {}
+    }
+  }'
+Method 2: Create a Video by RenderScript
+RenderScript is a JSON-based format for describing videos from scratch, providing complete control over video structure and content.
+Simple Example:
+bashcurl -X POST https://api.creatomate.com/v2/renders \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \\
+  -d '{
+    "output_format": "mp4",
+    "width": 1280,
+    "height": 720,
+    "duration": 3,
+    "elements": [
+      {
+        "type": "text",
+        "text": "My first video generated with RenderScript!",
+        "fill_color": "#ff0000",
+        "width": "50%",
+        "height": "25%"
+      }
+    ]
+  }'
+Hybrid Approach: Injecting RenderScript into Templates:
+bashcurl -X POST https://api.creatomate.com/v2/renders \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \\
+  -d '{
+    "template_id": "YOUR_TEMPLATE_ID_HERE",
+    "modifications": {
+      "elements.add": [
+        {
+          "type": "text",
+          "text": "This text element is inserted to an existing template",
+          "y": "28%",
+          "width": "88%",
+          "fill_color": "#ffffff"
+        }
+      ]
+    }
+  }'
+```
+
+---
+
+## **3. REST API REFERENCE**
+
+### **3.1 Create a Render**
+
+**Endpoint:**
+```
+POST https://api.creatomate.com/v2/renders
+```
+
+**Parameters:**
+
+| Parameter | Type | Optional | Description |
+|-----------|------|----------|-------------|
+| `template_id` | string | Yes | The ID of the template created in the editor. Omit this to use RenderScript directly. |
+| `modifications` | string/object | Yes | Changes to apply to the template before rendering. Learn more about modifications. |
+| `render_scale` | number | Yes | The scale at which to render. Default: 1.0 (100%). Range: 0.1 to 10. |
+| `max_width` | number | Yes | Scales output so width never exceeds this number. Combines with max_height; overrides render_scale. |
+| `max_height` | number | Yes | Scales output so height never exceeds this number. Combines with max_width; overrides render_scale. |
+| `webhook_url` | string | Yes | URL called when the render succeeds or fails. |
+| `metadata` | string | Yes | Custom value passed to the webhook URL. |
+
+**Response:**
+Returns a render object containing:
+- `id`: Unique render identifier
+- `status`: Current render state (planned, waiting, transcribing, rendering, succeeded, failed)
+- `url`: Download link (active when status is "succeeded")
+- Other metadata and properties
+
+### **3.2 Get the Status of a Render**
+
+**Endpoint:**
+```
+GET https://api.creatomate.com/v2/renders/RENDER_ID
+Description:
+Retrieves the current status of a render. Images typically render within seconds; videos may take longer. Polling is not recommended for large batches—use webhooks instead.
+Response Example:
+json{
+  "id": "a862048b-d0dc-4029-a4ef-e172e8ded827",
+  "status": "succeeded",
+  "url": "https://cdn.creatomate.com/renders/a862048b-d0dc-4029-a4ef-e172e8ded827.mp4",
+  "snapshot_url": "https://cdn.creatomate.com/snapshots/a862048b-d0dc-4029-a4ef-e172e8ded827.jpg",
+  "output_format": "mp4",
+  "render_scale": 1,
+  "width": 1280,
+  "height": 720,
+  "frame_rate": 60,
+  "duration": 3,
+  "file_size": 10804
+}
+```
+
+### **3.3 Set Up a Webhook**
+
+**Purpose:**
+Webhooks provide automatic notifications when renders complete or fail, eliminating the need for polling.
+
+**Configuration:**
+- **Project-level:** Set a default webhook URL in Project Settings
+- **Per-render:** Specify `webhook_url` when creating a render
+
+**Webhook Payload:**
+The webhook receives a POST request containing the complete render object (same structure as render status response).
+
+**Metadata:**
+Include custom data using the `metadata` parameter when initiating a render, which will be included in the webhook payload.
+
+### **3.4 Retrieve Templates**
+
+#### **Get All Templates in a Project**
+
+**Endpoint:**
+```
+GET https://api.creatomate.com/v1/templates
+Description:
+Returns a list of all templates in your project with metadata.
+Response Example:
+json[
+  {
+    "id": "c937d125-b99b-4690-96f0-6aa1f09438c9",
+    "name": "My Template",
+    "tags": ["My", "Assigned", "Tags"],
+    "created_at": "2026-01-01 12:00:00.000 +0200",
+    "updated_at": "2026-01-01 12:00:00.000 +0200"
+  },
+  {
+    "id": "bf95f053-28e1-4300-ac86-b52e5a3e0e5e",
+    "name": "Another Template",
+    "tags": [],
+    "created_at": "2026-01-01 12:00:00.000 +0200",
+    "updated_at": "2026-01-01 12:00:00.000 +0200"
+  }
+]
+```
+
+#### **Get a Template by Its ID**
+
+**Endpoint:**
+```
+GET https://api.creatomate.com/v1/templates/TEMPLATE_ID
+Description:
+Retrieves the RenderScript source code of a specific template. Useful when you need to work with RenderScript directly or perform advanced operations.
+Response Example:
+json{
+  "id": "087d94b5-cef6-44b7-96d4-4c651beec61d",
+  "name": "My Template",
+  "tags": ["My", "Assigned", "Tags"],
+  "created_at": "2026-01-01 12:00:00.000 +0200",
+  "updated_at": "2026-01-01 12:00:00.000 +0200",
+  "source": {}
+}
+3.5 What is a Render?
+A render is the process of generating a video, image, or GIF file using Creatomate's API. Key properties include:
+PropertyTypeDescriptionidstringUnique identifier for tracking the renderstatusstringCurrent state: planned, waiting, transcribing, rendering, succeeded, failederror_messagestringDescriptive error message if render failedurlstringDownload link for the rendered file (active when succeeded)snapshot_urlstringJPEG preview image for videos (if Snapshot Time is set)template_idstringID of the template used (null if RenderScript only)template_namestringHuman-readable template nametemplate_tagsarrayTags associated with the templateoutput_formatstringFile format: mp4, jpg, png, or gifrender_scalenumberScale factor applied (1 = 100% resolution)widthnumberOutput width in pixelsheightnumberOutput height in pixelsframe_ratenumberFPS for videosdurationnumberLength in seconds (videos only)file_sizenumberFinal file size in bytesmodificationsobjectKey-value pairs applied to the templatewebhook_urlstringURL that received the completion notificationmetadatastringCustom data attached for tracking
+
+4. RENDERSCRIPT
+What is RenderScript?
+RenderScript is a JSON-based format for defining videos, images, and GIFs. It serves as the foundation of all Creatomate functionality—even templates are built on RenderScript. Think of it as "HTML for video creation."
+Key Concepts:
+Elements: RenderScript documents consist of elements (text, video, images, compositions, audio, etc.) with properties that define appearance, timing, animations, and effects.
+Compositions: Logical groupings of elements that can contain sub-elements, enabling complex nested structures.
+Animations: Effects and transitions applied to elements with configurable timing and easing.
+Tracks: Layering system for organizing elements (track 1, 2, 3, etc.) to control stacking order.
+Why Use RenderScript Directly?
+
+Generate completely dynamic videos without templates
+Perform operations beyond simple template modifications
+Combine template base structures with programmatic customization
+Build flexible video generation pipelines
+
+RenderScript Elements:
+Common element types include:
+
+text: Display text with customizable fonts, colors, sizes
+video: Embed video files with transitions and effects
+audio: Add background music and sound effects
+image: Include images with animations
+shape: Draw rectangles, circles, and other shapes
+composition: Group related elements together
+And many more specialized types
+
+
+5. PREVIEW SDK
+What is the Preview SDK?
+The Preview SDK is a JavaScript library that brings real-time video rendering to the browser. It complements the cloud API by allowing users to preview videos and images before final rendering.
+Key Features:
+
+Real-time Preview: Display live previews of videos and images in the browser as users edit
+Interactive Editing: Build platforms where users can customize videos with live feedback
+Same Format: Uses identical JSON format as the REST API (no conversion needed)
+Framework-Independent: Works with vanilla JavaScript or any modern framework
+
+Limitations:
+The Preview SDK cannot generate final MP4 files in the browser due to hardware constraints. Final rendering must occur through the Creatomate API.
+Installation:
+The Preview SDK is published as a JavaScript library on NPM.com:
+bashnpm install @creatomate/preview-sdk
+Minimum Requirements:
+Hardware:
+
+Desktop devices only (not mobile)
+Modern computers with adequate GPU capabilities
+
+Browsers:
+
+Optimal: Chromium-based browsers (Chrome, Edge, Opera)
+Supported: Safari and Firefox (may have reduced smoothness)
+
+Performance:
+Performance depends heavily on device capabilities. The Preview SDK includes optimizations for smooth editing but older devices may not provide adequate experience.
+Recommended Implementation:
+Detect user's browser capabilities and initialize Preview SDK only when supported. For unsupported browsers, fall back to the Creatomate API for low-resolution quick renders.
+
+6. INTEGRATION METHODS
+6.1 Direct API Integration
+Make HTTP requests to the Creatomate REST API from your application using your preferred programming language.
+Supported Languages:
+
+cURL
+Node.js
+PHP
+Python
+Ruby
+C#
+Go
+Java
+
+6.2 No-Code Automation
+Creatomate is officially supported by popular no-code platforms:
+Zapier: Beginner-friendly platform for creating automation workflows without code. Integrates with 8,000+ apps.
+Make.com: Formerly Integromat. Better suited for advanced automation workflows with more complex logic.
+n8n: Low-code automation platform offering balance between no-code solutions and custom development.
+Pabbly: Alternative automation platform with Creatomate support.
+Bubble.io: For building custom web applications with Creatomate integration.
+6.3 Browser-based with Preview SDK
+Build custom video editing applications using the Preview SDK for real-time preview, then use the API for final rendering.
+
+7. LIMITS AND CONCURRENCY
+API Rate Limit
+Limit: 30 requests per 10-second window
+Response on Limit Exceeded: 429 Too Many Requests
+Recommendation: For applications expecting usage spikes, implement a queue mechanism to distribute API requests over time.
+Calculation: With proper queuing and webhook integration, the rate limit allows for 10,000+ video/image requests per hour.
+Render Concurrency
+Concurrency refers to the number of videos/images processed simultaneously.
+Key Points:
+
+You can enqueue 30 videos every 10 seconds (within rate limit)
+Enqueued renders may wait in queue if many are already processing
+Queue has no limit—all renders eventually complete
+Subscription plan determines concurrent render slots and queue priority
+
+Usage Flexibility:
+
+Generally, each customer can use ~20% of monthly quota within 24 hours
+Example: With 200,000 monthly credits, you can process ~40,000 credits per day
+This allows using entire 30-day allowance in about 5 days if needed
+
+Best Practices:
+
+Use Webhooks: More efficient than polling for status updates
+Implement Queuing: Distribute API requests to stay within rate limits
+Monitor Usage: Track credit consumption and plan accordingly
+Contact Support: For high-volume use cases, discuss optimization with support@creatomate.com
+
+
+8. FINDING YOUR API KEY
+Your API key is found in Project Settings in your Creatomate dashboard. Each project has its own unique API key, allowing you to keep development and production separate.
+Note: Your API key is also visible in quick-start code examples for cURL, Node.js, PHP, and other languages when logged into your account.
+
+9. SUPPORT
+For questions or assistance:
+
+Email: support@creatomate.com
+Twitter: @creatomate
+GitHub: github.com/creatomate
+LinkedIn: LinkedIn Company Page
+
+
+This comprehensive documentation covers all major aspects of the Creatomate API including authentication, endpoints, usage examples, limits, and integration options. Developers can use this as a complete reference guide for implementing Creatomate into their applications.

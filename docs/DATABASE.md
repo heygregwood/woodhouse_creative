@@ -1,7 +1,13 @@
 # Woodhouse Creative - Database Documentation
 
-**Last Updated:** December 22, 2025
+**Last Updated:** January 9, 2026
 **Database:** `~/woodhouse_creative/data/sqlite/creative.db`
+**Schema Verification:** Verified against SQLite database on January 9, 2026
+**Firestore Migration:** Firestore is source of truth, SQLite read-only for batch renders
+
+**Related Documentation:**
+- [EXCEL_SYNC_REFERENCE.md](EXCEL_SYNC_REFERENCE.md) - Excel column mapping
+- [DATA_ARCHITECTURE.md](DATA_ARCHITECTURE.md) - Overall data model
 
 ---
 

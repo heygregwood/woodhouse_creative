@@ -1,8 +1,13 @@
-# Woodhouse Creative - Data Architecture (Working Draft)
+# Woodhouse Creative - Data Architecture
 
-**Status:** Working Draft  
-**Created:** December 18, 2025  
-**Last Updated:** December 18, 2025
+**Status:** Current (updated for Firestore migration)
+**Created:** December 18, 2025
+**Last Updated:** January 9, 2026
+**Firestore Verification:** Verified against production Firestore on January 9, 2026
+
+**Related Documentation:**
+- [DATABASE.md](DATABASE.md) - Detailed database schema
+- [EXCEL_SYNC_REFERENCE.md](EXCEL_SYNC_REFERENCE.md) - Excel column mapping
 
 ---
 
