@@ -12,10 +12,16 @@ interface DoneDealer {
   email_type: 'first_post' | 'post_scheduled';
 }
 
+interface FieldChange {
+  field: string;
+  old: string | null;
+  new: string | null;
+}
+
 interface SyncChanges {
   new: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
   removed: Array<{ dealer_no: string; dealer_name: string; program_status: string }>;
-  updated: Array<{ dealer_no: string; dealer_name: string; changes: string[] }>;
+  updated: Array<{ dealer_no: string; dealer_name: string; changes?: FieldChange[] }>;
   unchanged: number;
 }
 
