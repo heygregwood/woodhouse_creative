@@ -87,13 +87,24 @@ export async function GET() {
         }
       }
 
-      // Count dealers promoted to FULL - they need manual review before spreadsheet/email
+      // Count dealers needing review:
+      // 1. Dealers promoted from CONTENT/NEW to FULL
+      // 2. New dealers added with FULL status
       const pendingReviewDealers: string[] = [];
+
+      // Check updated dealers for promotions
       if (changes.updated) {
         for (const dealer of changes.updated) {
           if (wasPromotedToFull(dealer)) {
-            // Don't auto-add to spreadsheet or send email
-            // These dealers are now marked as pending_review in the database
+            pendingReviewDealers.push(dealer.dealer_no);
+          }
+        }
+      }
+
+      // Check new dealers for FULL status
+      if (changes.new) {
+        for (const dealer of changes.new) {
+          if (dealer.program_status === 'FULL') {
             pendingReviewDealers.push(dealer.dealer_no);
           }
         }
