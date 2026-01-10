@@ -528,7 +528,11 @@ export default function CreativeAdminPage() {
                             </div>
                             <div className="divide-y divide-yellow-200 max-h-60 overflow-y-auto">
                               {syncResult.changes.updated.map((dealer) => {
-                                const wasPromoted = dealer.changes?.some(c => c.includes('program_status') && c.includes('FULL') && (c.includes('CONTENT') || c.includes('NEW')));
+                                const wasPromoted = dealer.changes?.some(c =>
+                                  c.field === 'program_status' &&
+                                  c.new === 'FULL' &&
+                                  (c.old === 'CONTENT' || c.old === 'NEW')
+                                );
                                 return (
                                   <div key={dealer.dealer_no} className="p-3 bg-white">
                                     <div className="flex justify-between items-start">
@@ -546,7 +550,7 @@ export default function CreativeAdminPage() {
                                       <div className="mt-1 space-y-0.5">
                                         {dealer.changes.map((change, idx) => (
                                           <p key={idx} className="text-xs text-yellow-700 font-mono">
-                                            {change}
+                                            {change.field}: {change.old || 'null'} → {change.new || 'null'}
                                           </p>
                                         ))}
                                       </div>
