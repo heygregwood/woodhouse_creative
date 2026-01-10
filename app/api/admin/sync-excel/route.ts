@@ -64,10 +64,8 @@ export async function GET() {
       const emailResults: Array<{ dealer_no: string; email_type: string; success: boolean; error?: string }> = [];
       const blockedDealers: string[] = [];
 
-      // TEMPORARILY DISABLED - Restoring database from Excel, don't send duplicate emails
       // Send welcome emails to new dealers (skip blocked dealers)
       // Rate limited to stay under Resend's 2 req/sec limit
-      /*
       if (changes.new) {
         for (let i = 0; i < changes.new.length; i++) {
           const dealer = changes.new[i];
@@ -88,7 +86,6 @@ export async function GET() {
           }
         }
       }
-      */
 
       // Count dealers promoted to FULL - they need manual review before spreadsheet/email
       const pendingReviewDealers: string[] = [];
