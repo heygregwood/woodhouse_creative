@@ -1,16 +1,14 @@
 // app/api/creative/render-batch/route.ts
-// API endpoint to start batch renders for all FULL dealers from SQLite
+// API endpoint to start batch renders for all FULL dealers from Firestore
+// NOTE: Migrated from SQLite to Firestore Jan 2026
 
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
 import {
   createRenderBatch,
   createRenderJob,
   isBatchProcessing,
 } from '@/lib/renderQueue';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+import { getDealers } from '@/lib/firestore-dealers';
 
 interface RenderRequest {
   postNumber: number;
@@ -76,39 +74,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get FULL dealers from SQLite with complete creatomate data
+    // Get FULL dealers from Firestore with complete creatomate data
     // If any request has a dealerNo filter, collect all unique dealer numbers
-    const dealerNos = new Set<string>();
+    const dealerNoFilter = new Set<string>();
     for (const req of renderRequests) {
       if (req.dealerNo) {
-        dealerNos.add(req.dealerNo);
+        dealerNoFilter.add(req.dealerNo);
       }
     }
 
-    const db = new Database(DB_PATH, { readonly: true });
+    // Get all dealers from Firestore and filter
+    const allDealers = await getDealers();
 
-    let query = `
-      SELECT dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo
-      FROM dealers
-      WHERE program_status = 'FULL'
-        AND ready_for_automate = 'yes'
-        AND creatomate_logo IS NOT NULL
-        AND creatomate_logo != ''
-        AND display_name IS NOT NULL
-        AND display_name != ''
-    `;
-
-    const params: string[] = [];
+    let dealers = allDealers.filter(d =>
+      d.program_status === 'FULL' &&
+      d.ready_for_automate === 'yes' &&
+      d.creatomate_logo &&
+      d.creatomate_logo !== '' &&
+      d.display_name &&
+      d.display_name !== ''
+    ).map(d => ({
+      dealer_no: d.dealer_no,
+      display_name: d.display_name || '',
+      creatomate_phone: d.creatomate_phone || '',
+      creatomate_website: d.creatomate_website || '',
+      creatomate_logo: d.creatomate_logo || '',
+    })) as Dealer[];
 
     // If specific dealers requested, filter to those
-    if (dealerNos.size > 0) {
-      const placeholders = Array.from(dealerNos).map(() => '?').join(', ');
-      query += ` AND dealer_no IN (${placeholders})`;
-      params.push(...Array.from(dealerNos));
+    if (dealerNoFilter.size > 0) {
+      dealers = dealers.filter(d => dealerNoFilter.has(d.dealer_no));
     }
-
-    const dealers = db.prepare(query).all(...params) as Dealer[];
-    db.close();
 
     if (dealers.length === 0) {
       return NextResponse.json(

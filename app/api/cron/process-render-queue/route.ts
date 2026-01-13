@@ -1,18 +1,16 @@
 // app/api/cron/process-render-queue/route.ts
 // Cron job to process pending render jobs from the queue
+// NOTE: Migrated from SQLite to Firestore Jan 2026
 
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
 import {
   getPendingRenderJobs,
   updateRenderJob,
   updateBatchProgress,
 } from '@/lib/renderQueue';
 import { createRender } from '@/lib/creatomate';
+import { getDealer } from '@/lib/firestore-dealers';
 import { Timestamp } from 'firebase-admin/firestore';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 /**
  * GET /api/cron/process-render-queue
@@ -72,20 +70,8 @@ export async function GET(request: NextRequest) {
       try {
         results.processed++;
 
-        // Get dealer data from SQLite
-        const db = new Database(DB_PATH, { readonly: true });
-        const dealer = db.prepare(`
-          SELECT dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo
-          FROM dealers
-          WHERE dealer_no = ?
-        `).get(job.businessId) as {
-          dealer_no: string;
-          display_name: string;
-          creatomate_phone: string;
-          creatomate_website: string;
-          creatomate_logo: string;
-        } | undefined;
-        db.close();
+        // Get dealer data from Firestore
+        const dealer = await getDealer(job.businessId);
 
         if (!dealer) {
           throw new Error(`Dealer not found: ${job.businessId}`);

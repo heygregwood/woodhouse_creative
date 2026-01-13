@@ -2,14 +2,14 @@
  * Google Sheets Module - Replaces Python add_dealer_to_spreadsheet.py
  *
  * Handles adding dealers to scheduling spreadsheet and populating post copy
+ *
+ * NOTE: Uses Firestore for dealer data (migrated from SQLite Jan 2026)
  */
 
 import { google } from 'googleapis';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { getDealer as getFirestoreDealer } from '@/lib/firestore-dealers';
 
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 // Row indices (1-based)
 const ROW_DEALER_NO = 1;      // Row 1: Dealer numbers
@@ -71,29 +71,10 @@ function getGoogleAuth() {
 }
 
 /**
- * Get dealer data from database
+ * Get dealer data from Firestore
  */
-function getDealerFromDb(dealerNo: string): DealerSpreadsheetData | null {
-  const db = new Database(DB_PATH, { readonly: true });
-
-  const dealer = db.prepare(`
-    SELECT
-      dealer_no,
-      display_name,
-      creatomate_phone,
-      creatomate_website,
-      dealer_name,
-      distributor_name,
-      contact_first_name,
-      contact_name,
-      contact_email,
-      region,
-      program_status
-    FROM dealers
-    WHERE dealer_no = ?
-  `).get(dealerNo) as any;
-
-  db.close();
+async function getDealerFromDb(dealerNo: string): Promise<DealerSpreadsheetData | null> {
+  const dealer = await getFirestoreDealer(dealerNo);
 
   if (!dealer) {
     return null;
@@ -197,8 +178,8 @@ export async function addDealerToSpreadsheet(
     column: null,
   };
 
-  // Get dealer from database
-  const dealer = getDealerFromDb(dealerNo);
+  // Get dealer from Firestore
+  const dealer = await getDealerFromDb(dealerNo);
   if (!dealer) {
     result.message = `Dealer ${dealerNo} not found in database`;
     return result;
@@ -375,8 +356,8 @@ export async function populatePostCopyForDealer(
   rowNumber: number
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Get dealer data from database
-    const dealer = getDealerFromDb(dealerNo);
+    // Get dealer data from Firestore
+    const dealer = await getDealerFromDb(dealerNo);
     if (!dealer) {
       return { success: false, message: `Dealer ${dealerNo} not found in database` };
     }

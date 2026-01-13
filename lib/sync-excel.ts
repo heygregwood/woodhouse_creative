@@ -308,6 +308,10 @@ export async function readDatabaseDealers(): Promise<Map<string, any>> {
 
   const firestoreDealers = await getDealers();
   for (const dealer of firestoreDealers) {
+    // Skip dealers already marked as REMOVED - they shouldn't appear in sync results
+    if (dealer.allied_status === 'REMOVED') {
+      continue;
+    }
     dealers.set(dealer.dealer_no, dealer);
   }
 

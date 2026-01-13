@@ -3,15 +3,15 @@
  *
  * Sends emails to multiple dealers and updates spreadsheet status.
  * Called when dealers have "Done" status and need "Email Sent" notifications.
+ *
+ * NOTE: Migrated from SQLite to Firestore Jan 2026
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { getDealers } from '@/lib/firestore-dealers';
 
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 const COL_DEALERS_START = 6;
 
 // Row indices (0-indexed)
@@ -181,17 +181,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Spreadsheet missing expected rows' }, { status: 500 });
     }
 
-    // Get dealer display names from database
-    const db = new Database(DB_PATH, { readonly: true });
+    // Get dealer display names from Firestore
+    const allDealers = await getDealers();
     const dealerInfo: Record<string, string> = {};
-    const dealerQuery = db.prepare(`
-      SELECT dealer_no, display_name FROM dealers WHERE dealer_no IN (${dealerNumbers.map(() => '?').join(',')})
-    `);
-    const dbDealers = dealerQuery.all(...dealerNumbers) as { dealer_no: string; display_name: string }[];
-    for (const d of dbDealers) {
-      dealerInfo[d.dealer_no] = d.display_name;
+    for (const d of allDealers) {
+      if (dealerNumbers.includes(d.dealer_no)) {
+        dealerInfo[d.dealer_no] = d.display_name || '';
+      }
     }
-    db.close();
 
     // Find columns for each dealer and send emails
     const numCols = rows[0]?.length || 0;

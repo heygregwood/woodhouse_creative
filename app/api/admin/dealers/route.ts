@@ -1,39 +1,49 @@
-// GET /api/admin/dealers - Fetch dealers from SQLite
+// GET /api/admin/dealers - Fetch dealers from Firestore
+// NOTE: Migrated from SQLite to Firestore Jan 2026
 import { NextRequest, NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
+import { getDealers } from '@/lib/firestore-dealers';
 
 export async function GET(request: NextRequest) {
   const filter = request.nextUrl.searchParams.get('filter') || 'not-ready';
 
   try {
-    const db = new Database(DB_PATH, { readonly: true });
+    // Get all FULL dealers from Firestore
+    const allDealers = await getDealers();
 
-    let query = `
-      SELECT dealer_no, display_name, creatomate_website, creatomate_logo, creatomate_phone, ready_for_automate, logo_source
-      FROM dealers
-      WHERE program_status = 'FULL'
-    `;
+    let dealers = allDealers.filter(d => d.program_status === 'FULL');
 
     if (filter === 'not-ready') {
-      query += ` AND (ready_for_automate IS NULL OR ready_for_automate != 'yes')`;
+      dealers = dealers.filter(d => !d.ready_for_automate || d.ready_for_automate !== 'yes');
     } else if (filter === 'no-logo') {
-      query += ` AND (creatomate_logo IS NULL OR creatomate_logo = '')`;
+      dealers = dealers.filter(d => !d.creatomate_logo || d.creatomate_logo === '');
     } else if (filter === 'round2') {
-      // Show dealers with logos updated today (the ones from Round 2 that got new selections)
-      query += ` AND logo_source IN ('brandfetch', 'website', 'favicon') AND updated_at > datetime('now', '-1 day')`;
+      // Show dealers with logos updated recently (those from Round 2 that got new selections)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      dealers = dealers.filter(d =>
+        d.logo_source &&
+        ['brandfetch', 'website', 'favicon'].includes(d.logo_source) &&
+        d.updated_at &&
+        new Date(d.updated_at) > oneDayAgo
+      );
     }
 
-    query += ` ORDER BY display_name`;
+    // Sort by display_name
+    dealers.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''));
 
-    const dealers = db.prepare(query).all();
-    db.close();
+    // Map to expected response format
+    const result = dealers.map(d => ({
+      dealer_no: d.dealer_no,
+      display_name: d.display_name || '',
+      creatomate_website: d.creatomate_website || '',
+      creatomate_logo: d.creatomate_logo || '',
+      creatomate_phone: d.creatomate_phone || '',
+      ready_for_automate: d.ready_for_automate || '',
+      logo_source: d.logo_source || '',
+    }));
 
-    return NextResponse.json({ dealers });
-  } catch (error) {
-    console.error('Database error:', error);
+    return NextResponse.json({ dealers: result });
+  } catch (error: unknown) {
+    console.error('[admin/dealers] Database error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch dealers' },
       { status: 500 }

@@ -713,9 +713,34 @@ python3 scripts/batch_render.py --post 700 --template abc123 --dealer 10122026
 python3 scripts/batch_render.py --post 700 --template abc123 --dry-run
 ```
 
-### Query database
+### Query SQLite (legacy - use Firestore instead)
 ```bash
 sqlite3 ~/woodhouse_creative/data/sqlite/creative.db "SELECT COUNT(*) FROM dealers WHERE program_status = 'FULL';"
+```
+
+### Query Firestore (primary database)
+```bash
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a && npx tsx -e "
+import { getDealers } from './lib/firestore-dealers';
+
+async function check() {
+  const dealers = await getDealers();
+  console.log('Total dealers:', dealers.length);
+
+  // Count by status
+  const byStatus: Record<string, number> = {};
+  for (const d of dealers) {
+    byStatus[d.program_status || 'unknown'] = (byStatus[d.program_status || 'unknown'] || 0) + 1;
+  }
+  console.log('By status:', byStatus);
+
+  // Check specific dealer (replace with dealer number)
+  const dealer = dealers.find(d => d.dealer_no === '10122026');
+  if (dealer) console.log('Found:', dealer.dealer_no, dealer.dealer_name);
+}
+check();
+"
 ```
 
 ### Run dev server

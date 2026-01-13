@@ -9,12 +9,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import Database from 'better-sqlite3';
-import path from 'path';
 
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
 const POSTS_FILE_ID = '1-lhgjbNL1QBFNLZ5eSQSdaJTwIX0JKfE';
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 
 const COL_DEALERS_START = 6; // Column G (0-indexed)
 
@@ -173,32 +170,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Store post info in database for tracking
-    try {
-      const db = new Database(DB_PATH);
-      db.prepare(`
-        CREATE TABLE IF NOT EXISTS posts (
-          post_number TEXT PRIMARY KEY,
-          template_id TEXT NOT NULL,
-          base_copy TEXT NOT NULL,
-          season TEXT,
-          subject_matter TEXT,
-          tags TEXT,
-          spreadsheet_row INTEGER,
-          created_at TEXT DEFAULT (datetime('now')),
-          updated_at TEXT DEFAULT (datetime('now'))
-        )
-      `).run();
-
-      db.prepare(`
-        INSERT OR REPLACE INTO posts (post_number, template_id, base_copy, season, subject_matter, tags, spreadsheet_row, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(postNumber, templateId, baseCopy, season, subjectMatter, tags, nextRow);
-
-      db.close();
-    } catch (dbError) {
-      console.error('Database save error (non-critical):', dbError);
-    }
+    // Note: Post tracking is handled by the spreadsheet itself
+    // No additional database storage needed
 
     return NextResponse.json({
       success: true,

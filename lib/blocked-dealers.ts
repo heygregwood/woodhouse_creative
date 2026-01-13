@@ -16,6 +16,8 @@ export const TEST_DEALER_NO = '99999999';
 export const BLOCKED_DEALER_NOS = new Set([
   // Test account - G W Berkheimer Co Inc GW BERKHEIMER - HQ TEST ACCOUNT
   '10491009',
+  // Note: 99999001 (Relief Heat and Air) and 99999002 (Eco) are REAL dealers
+  // without Allied Air numbers - do NOT block them
 ]);
 
 /**

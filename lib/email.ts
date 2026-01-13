@@ -3,18 +3,19 @@
  *
  * Handles all dealer email notifications using Resend API
  * Updates Google Sheets spreadsheet status after sending
+ *
+ * NOTE: Uses Firestore for dealer data (migrated from SQLite Jan 2026)
  */
 
 import { google } from 'googleapis';
-import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { isDealerBlocked } from '@/lib/blocked-dealers';
+import { getDealer as getFirestoreDealer } from '@/lib/firestore-dealers';
 
 // Constants
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
-const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 const TEMPLATES_PATH = path.join(process.cwd(), 'templates', 'emails');
 
 const FROM_EMAIL = 'communitymanagers@woodhouseagency.com';
@@ -152,28 +153,22 @@ export async function updateEmailStatus(dealerNo: string, status: string = 'Emai
 }
 
 /**
- * Fetch dealer data from database
+ * Fetch dealer data from Firestore
  */
-export function getDealer(dealerNo: string): DealerData | null {
-  const db = new Database(DB_PATH, { readonly: true });
+export async function getDealer(dealerNo: string): Promise<DealerData | null> {
+  const dealer = await getFirestoreDealer(dealerNo);
+  if (!dealer) return null;
 
-  const dealer = db.prepare(`
-    SELECT
-      dealer_no,
-      display_name,
-      contact_first_name,
-      contact_email,
-      distributor_name,
-      program_status,
-      armstrong_air,
-      airease
-    FROM dealers
-    WHERE dealer_no = ?
-  `).get(dealerNo) as DealerData | undefined;
-
-  db.close();
-
-  return dealer || null;
+  return {
+    dealer_no: dealer.dealer_no,
+    display_name: dealer.display_name || dealer.dealer_name || '',
+    contact_first_name: dealer.contact_first_name || null,
+    contact_email: dealer.contact_email || null,
+    distributor_name: dealer.distributor_name || null,
+    program_status: dealer.program_status,
+    armstrong_air: dealer.armstrong_air || 0,
+    airease: dealer.airease || 0,
+  };
 }
 
 /**
@@ -295,7 +290,7 @@ export async function sendWelcomeEmail(dealerNo: string): Promise<EmailResult> {
     return { success: false, error: `Dealer ${dealerNo} is blocked from emails`, blocked: true };
   }
 
-  const dealer = getDealer(dealerNo);
+  const dealer = await getDealer(dealerNo);
   if (!dealer) {
     return { success: false, error: `Dealer not found: ${dealerNo}` };
   }
@@ -337,7 +332,7 @@ export async function sendFbAdminAcceptedEmail(
     return { success: false, error: `Dealer ${dealerNo} is blocked from emails`, blocked: true };
   }
 
-  const dealer = getDealer(dealerNo);
+  const dealer = await getDealer(dealerNo);
   if (!dealer) {
     return { success: false, error: `Dealer not found: ${dealerNo}` };
   }
@@ -379,7 +374,7 @@ export async function sendFirstPostScheduledEmail(
     return { success: false, error: `Dealer ${dealerNo} is blocked from emails`, blocked: true };
   }
 
-  const dealer = getDealer(dealerNo);
+  const dealer = await getDealer(dealerNo);
   if (!dealer) {
     return { success: false, error: `Dealer not found: ${dealerNo}` };
   }
@@ -422,7 +417,7 @@ export async function sendPostScheduledEmail(
     return { success: false, error: `Dealer ${dealerNo} is blocked from emails`, blocked: true };
   }
 
-  const dealer = getDealer(dealerNo);
+  const dealer = await getDealer(dealerNo);
   if (!dealer) {
     return { success: false, error: `Dealer not found: ${dealerNo}` };
   }
@@ -464,7 +459,7 @@ export async function sendContentReadyEmail(
     return { success: false, error: `Dealer ${dealerNo} is blocked from emails`, blocked: true };
   }
 
-  const dealer = getDealer(dealerNo);
+  const dealer = await getDealer(dealerNo);
   if (!dealer) {
     return { success: false, error: `Dealer not found: ${dealerNo}` };
   }
