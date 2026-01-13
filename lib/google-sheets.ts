@@ -8,6 +8,7 @@
 
 import { google } from 'googleapis';
 import { getDealer as getFirestoreDealer } from '@/lib/firestore-dealers';
+import { db } from '@/lib/firebase';
 
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
 
@@ -305,7 +306,8 @@ export async function addDealerToSpreadsheet(
 
 /**
  * Get active posts from scheduling spreadsheet
- * Returns posts from row 13+ that have a post number, template ID, and base copy
+ * Returns posts from row 13+ that have a post number and base copy
+ * Template IDs are fetched from Firestore posts collection
  */
 export async function getActivePostsFromSpreadsheet(): Promise<Array<{
   postNumber: number;
@@ -316,7 +318,8 @@ export async function getActivePostsFromSpreadsheet(): Promise<Array<{
   const auth = getGoogleAuth();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // Read columns A (post number), B (template ID), C (base copy) from row 13 onwards
+  // Read columns A (post number) and C (base copy) from row 13 onwards
+  // Column B is NOTES, not template ID - template IDs come from Firestore
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: 'Sheet1!A13:C1000'
@@ -328,16 +331,23 @@ export async function getActivePostsFromSpreadsheet(): Promise<Array<{
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const postNumber = parseInt(row[0]);
-    const templateId = row[1]?.trim();
-    const baseCopy = row[2]?.trim();
+    const baseCopy = row[2]?.trim();  // Column C is base copy
 
-    if (!isNaN(postNumber) && templateId && baseCopy) {
-      posts.push({
-        postNumber,
-        templateId,
-        baseCopy,
-        rowNumber: 13 + i  // Actual row number in spreadsheet
-      });
+    if (!isNaN(postNumber) && baseCopy) {
+      // Look up template ID from Firestore posts collection
+      const postDoc = await db.collection('posts').doc(postNumber.toString()).get();
+      const templateId = postDoc.exists ? postDoc.data()?.templateId : null;
+
+      if (templateId) {
+        posts.push({
+          postNumber,
+          templateId,
+          baseCopy,
+          rowNumber: 13 + i  // Actual row number in spreadsheet
+        });
+      } else {
+        console.log(`[google-sheets] Post ${postNumber} has no template ID in Firestore, skipping`);
+      }
     }
   }
 
