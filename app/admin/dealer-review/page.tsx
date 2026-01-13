@@ -292,11 +292,7 @@ export default function DealerReviewPage() {
       if (data.success) {
         setApproveResults((prev) => ({
           ...prev,
-          [dealer.dealer_no]: {
-            success: true,
-            message: `Approved! Automation complete.`,
-            data,  // Store full data for detailed display
-          },
+          [dealer.dealer_no]: data,  // Store response directly (already has success, spreadsheet, etc.)
         }));
         // Remove from list after longer delay to show details
         setTimeout(() => {
