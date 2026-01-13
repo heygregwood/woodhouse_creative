@@ -37,6 +37,21 @@ interface EditableDealer extends DealerReview {
   edited_region: string;
 }
 
+interface ApprovalResult {
+  success: boolean;
+  message?: string;
+  dealer_no?: string;
+  spreadsheet?: { success: boolean; column: string };
+  postsPopulated?: number;
+  postPopulateErrors?: any[];
+  renderBatches?: string[];
+  renderBatchErrors?: any[];
+  email?: { success: boolean };
+  oliviaEmail?: { success: boolean };
+  warnings?: string[];
+  estimatedCompletion?: string;
+}
+
 const LOGOS_FOLDER_URL = 'https://drive.google.com/drive/folders/17TNIFS-5Nnrn3b-_knPPm5u-f1X_UUbR?usp=sharing';
 
 export default function DealerReviewPage() {
@@ -44,7 +59,7 @@ export default function DealerReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
-  const [approveResults, setApproveResults] = useState<Record<string, { success: boolean; message: string }>>({});
+  const [approveResults, setApproveResults] = useState<Record<string, ApprovalResult>>({});
 
   // Logo finder overlay state
   const [logoOverlay, setLogoOverlay] = useState<{
@@ -524,25 +539,25 @@ export default function DealerReviewPage() {
                           : 'bg-red-50 border border-red-400'
                       }`}
                     >
-                      {approveResults[dealer.dealer_no].success && approveResults[dealer.dealer_no].data ? (
+                      {approveResults[dealer.dealer_no].success && approveResults[dealer.dealer_no].spreadsheet ? (
                         <>
                           <p className="font-semibold text-green-800 mb-2">
                             ✓ Approved! Automation Complete
                           </p>
                           <div className="text-sm text-green-700 space-y-1">
-                            <p>• Spreadsheet: Added (column {approveResults[dealer.dealer_no].data.spreadsheet?.column})</p>
-                            <p>• Post copy: {approveResults[dealer.dealer_no].data.postsPopulated} post(s) populated</p>
-                            <p>• Render batches: {approveResults[dealer.dealer_no].data.renderBatches?.length || 0} created</p>
+                            <p>• Spreadsheet: Added (column {approveResults[dealer.dealer_no].spreadsheet?.column})</p>
+                            <p>• Post copy: {approveResults[dealer.dealer_no].postsPopulated} post(s) populated</p>
+                            <p>• Render batches: {approveResults[dealer.dealer_no].renderBatches?.length || 0} created</p>
                             <p>• Emails: Sent to dealer and Olivia</p>
                           </div>
                           <p className="text-sm text-green-600 mt-2">
-                            Renders will complete in ~{approveResults[dealer.dealer_no].data.estimatedCompletion}
+                            Renders will complete in ~{approveResults[dealer.dealer_no].estimatedCompletion}
                           </p>
-                          {approveResults[dealer.dealer_no].data.warnings && approveResults[dealer.dealer_no].data.warnings.length > 0 && (
+                          {approveResults[dealer.dealer_no].warnings && approveResults[dealer.dealer_no].warnings.length > 0 && (
                             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-300 rounded">
                               <p className="text-xs font-medium text-yellow-800">⚠ Warnings:</p>
                               <ul className="text-xs text-yellow-700 ml-4 list-disc">
-                                {approveResults[dealer.dealer_no].data.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                                {approveResults[dealer.dealer_no].warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
                               </ul>
                             </div>
                           )}
