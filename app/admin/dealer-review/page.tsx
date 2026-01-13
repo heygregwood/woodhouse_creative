@@ -212,6 +212,41 @@ export default function DealerReviewPage() {
     }
   };
 
+  // Save logo permanently to permanent folder and auto-fill form
+  const saveLogoPermanently = async () => {
+    if (!logoOverlay?.savedToStaging) return;
+
+    setLogoOverlay((prev) => (prev ? { ...prev, saving: true } : null));
+
+    try {
+      const response = await fetch('/api/admin/save-logo-permanent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stagingFileName: logoOverlay.savedToStaging,
+          dealerNo: logoOverlay.dealerNo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Auto-populate logo field
+        updateField(logoOverlay.dealerNo, 'edited_logo', data.logoUrl);
+        // Close overlay
+        setLogoOverlay(null);
+      } else {
+        setLogoOverlay((prev) =>
+          prev ? { ...prev, saving: false, error: data.error || 'Failed to save logo permanently' } : null
+        );
+      }
+    } catch (err) {
+      setLogoOverlay((prev) =>
+        prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to save permanently' } : null
+      );
+    }
+  };
+
   // Approve dealer
   const approveDealer = async (dealer: EditableDealer) => {
     if (!dealer.edited_display_name || !dealer.edited_phone || !dealer.edited_logo) {
@@ -244,13 +279,14 @@ export default function DealerReviewPage() {
           ...prev,
           [dealer.dealer_no]: {
             success: true,
-            message: `Approved! Spreadsheet: ${data.spreadsheet?.success ? 'Added' : 'Failed'}, Email: ${data.email?.success ? 'Sent' : 'Failed'}`,
+            message: `Approved! Automation complete.`,
+            data,  // Store full data for detailed display
           },
         }));
-        // Remove from list after short delay
+        // Remove from list after longer delay to show details
         setTimeout(() => {
           setDealers((prev) => prev.filter((d) => d.dealer_no !== dealer.dealer_no));
-        }, 2000);
+        }, 5000);
       } else {
         setApproveResults((prev) => ({
           ...prev,
@@ -482,13 +518,40 @@ export default function DealerReviewPage() {
                   {/* Approve Result */}
                   {approveResults[dealer.dealer_no] && (
                     <div
-                      className={`p-3 rounded-lg ${
+                      className={`p-4 rounded-lg ${
                         approveResults[dealer.dealer_no].success
-                          ? 'bg-green-50 border border-green-400 text-green-800'
-                          : 'bg-red-50 border border-red-400 text-red-800'
+                          ? 'bg-green-50 border border-green-400'
+                          : 'bg-red-50 border border-red-400'
                       }`}
                     >
-                      {approveResults[dealer.dealer_no].message}
+                      {approveResults[dealer.dealer_no].success && approveResults[dealer.dealer_no].data ? (
+                        <>
+                          <p className="font-semibold text-green-800 mb-2">
+                            ✓ Approved! Automation Complete
+                          </p>
+                          <div className="text-sm text-green-700 space-y-1">
+                            <p>• Spreadsheet: Added (column {approveResults[dealer.dealer_no].data.spreadsheet?.column})</p>
+                            <p>• Post copy: {approveResults[dealer.dealer_no].data.postsPopulated} post(s) populated</p>
+                            <p>• Render batches: {approveResults[dealer.dealer_no].data.renderBatches?.length || 0} created</p>
+                            <p>• Emails: Sent to dealer and Olivia</p>
+                          </div>
+                          <p className="text-sm text-green-600 mt-2">
+                            Renders will complete in ~{approveResults[dealer.dealer_no].data.estimatedCompletion}
+                          </p>
+                          {approveResults[dealer.dealer_no].data.warnings && approveResults[dealer.dealer_no].data.warnings.length > 0 && (
+                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-300 rounded">
+                              <p className="text-xs font-medium text-yellow-800">⚠ Warnings:</p>
+                              <ul className="text-xs text-yellow-700 ml-4 list-disc">
+                                {approveResults[dealer.dealer_no].data.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className={approveResults[dealer.dealer_no].success ? 'text-green-800' : 'text-red-800'}>
+                          {approveResults[dealer.dealer_no].message}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -568,14 +631,22 @@ export default function DealerReviewPage() {
                     <strong>{logoOverlay.savedToStaging}</strong> saved to logos_staging folder.
                   </p>
                   <p className="text-sm text-gray-500 mb-4">
-                    Process the logo offline, upload to the logos folder, then paste the URL in the form.
+                    Choose an option:
                   </p>
-                  <button
-                    onClick={() => setLogoOverlay((prev) => prev ? { ...prev, savedToStaging: null } : null)}
-                    className="px-4 py-2 bg-[#5378a8] text-white rounded-lg hover:bg-[#4a6890] transition-colors"
-                  >
-                    Download Another
-                  </button>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => saveLogoPermanently()}
+                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                    >
+                      Save Permanently & Auto-Fill
+                    </button>
+                    <button
+                      onClick={() => setLogoOverlay((prev) => prev ? { ...prev, savedToStaging: null } : null)}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                    >
+                      Download Another
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div>

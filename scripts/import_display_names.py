@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Extract display_name (Company Name) from scheduling spreadsheet and update SQLite."""
 
+import os
 import pandas as pd
 import sqlite3
 from pathlib import Path
 
-EXCEL_DIR = Path("/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+EXCEL_DIR = Path(f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
 SCHEDULE_FILE = EXCEL_DIR / "Turnkey SM  -  FOR POSTING - BY REGION.xlsx"
 DB_PATH = Path(__file__).parent.parent / "data" / "sqlite" / "creative.db"
 

@@ -9,8 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDealers, approveDealer, type FirestoreDealer } from '@/lib/firestore-dealers';
-import { addDealerToSpreadsheet } from '@/lib/google-sheets';
-import { sendFbAdminAcceptedEmail } from '@/lib/email';
+import { addDealerToSpreadsheet, getActivePostsFromSpreadsheet, populatePostCopyForDealer } from '@/lib/google-sheets';
+import { sendFbAdminAcceptedEmail, sendOnboardingCompleteEmail } from '@/lib/email';
 
 interface DealerReview {
   dealer_no: string;
@@ -58,7 +58,7 @@ interface ApproveRequest {
   region?: string;
 }
 
-// POST - Approve dealer after review
+// POST - Approve dealer after review (with full automation)
 export async function POST(request: NextRequest) {
   try {
     const body: ApproveRequest = await request.json();
@@ -79,7 +79,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update dealer in Firestore with validated fields (website can be empty)
+    console.log(`[dealer-review] Starting automated onboarding for dealer ${dealer_no}`);
+
+    // 1. Update dealer in Firestore with validated fields (website can be empty)
     await approveDealer(dealer_no, {
       display_name,
       creatomate_phone,
@@ -88,22 +90,147 @@ export async function POST(request: NextRequest) {
       region,
     });
 
-    // Add dealer to scheduling spreadsheet
+    // 2. Add dealer to scheduling spreadsheet
     const spreadsheetResult = await addDealerToSpreadsheet(dealer_no);
+    if (!spreadsheetResult.success) {
+      throw new Error(`Failed to add to spreadsheet: ${spreadsheetResult.message}`);
+    }
 
-    // Send FB Admin Accepted email
+    const spreadsheetColumn = spreadsheetResult.column!;
+    console.log(`[dealer-review] Added to spreadsheet column ${spreadsheetColumn}`);
+
+    // 3. Get active posts from spreadsheet
+    const activePosts = await getActivePostsFromSpreadsheet();
+    console.log(`[dealer-review] Found ${activePosts.length} active posts`);
+
+    // 4. Populate post copy for each active post
+    const populateResults = [];
+    for (const post of activePosts) {
+      try {
+        const result = await populatePostCopyForDealer(
+          dealer_no,
+          post.postNumber,
+          post.baseCopy,
+          post.rowNumber
+        );
+        populateResults.push({ postNumber: post.postNumber, ...result });
+      } catch (error) {
+        console.error(`[dealer-review] Failed to populate post ${post.postNumber}:`, error);
+        populateResults.push({
+          postNumber: post.postNumber,
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    const successfulPopulates = populateResults.filter(r => r.success).length;
+    console.log(`[dealer-review] Populated ${successfulPopulates}/${activePosts.length} posts`);
+
+    // 5. Create render jobs for this ONE dealer (using dealerNo filter)
+    const renderResults = [];
+    for (const post of activePosts) {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/creative/render-batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            postNumber: post.postNumber,
+            templateId: post.templateId,
+            dealerNo: dealer_no  // Filter to this one dealer
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+          const batchId = data.batches?.[0]?.batchId || '';
+          renderResults.push({
+            postNumber: post.postNumber,
+            success: true,
+            batchId,
+            message: 'Batch created'
+          });
+        } else {
+          renderResults.push({
+            postNumber: post.postNumber,
+            success: false,
+            batchId: '',
+            message: data.error || data.message || 'Failed to create batch'
+          });
+        }
+      } catch (error) {
+        console.error(`[dealer-review] Failed to create render batch for post ${post.postNumber}:`, error);
+        renderResults.push({
+          postNumber: post.postNumber,
+          success: false,
+          batchId: '',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    const successfulRenders = renderResults.filter(r => r.success).length;
+    console.log(`[dealer-review] Created ${successfulRenders}/${activePosts.length} render batches`);
+
+    // 6. Calculate estimated completion time
+    const avgRenderTime = 2; // minutes per post
+    const estimatedMinutes = activePosts.length * avgRenderTime;
+    const estimatedCompletion = estimatedMinutes < 60
+      ? `${estimatedMinutes} minutes`
+      : `${Math.round(estimatedMinutes / 60)} hour${estimatedMinutes >= 120 ? 's' : ''}`;
+
+    // 7. Send notification email to Olivia
+    let oliviaEmailSuccess = false;
+    try {
+      const oliviaResult = await sendOnboardingCompleteEmail({
+        dealerNo: dealer_no,
+        dealerName: display_name,
+        postsCount: activePosts.length,
+        estimatedCompletion,
+        spreadsheetColumn,
+      });
+      oliviaEmailSuccess = oliviaResult.success;
+    } catch (error) {
+      console.error('[dealer-review] Failed to send Olivia notification:', error);
+    }
+
+    // 8. Send FB Admin email to dealer
     const emailResult = await sendFbAdminAcceptedEmail(dealer_no);
+
+    // 9. Build comprehensive response
+    const warnings = [];
+
+    if (successfulPopulates < activePosts.length) {
+      warnings.push(`${activePosts.length - successfulPopulates} post(s) failed to populate`);
+    }
+    if (successfulRenders < activePosts.length) {
+      warnings.push(`${activePosts.length - successfulRenders} render batch(es) failed`);
+    }
+    if (!oliviaEmailSuccess) {
+      warnings.push('Notification email to Olivia failed');
+    }
+    if (!emailResult.success) {
+      warnings.push('FB Admin email to dealer failed');
+    }
+
+    console.log(`[dealer-review] Onboarding complete for dealer ${dealer_no}`);
 
     return NextResponse.json({
       success: true,
       dealer_no,
-      spreadsheet: spreadsheetResult,
-      email: {
-        success: emailResult.success,
-        error: emailResult.error,
-      },
+      spreadsheet: { success: true, column: spreadsheetColumn },
+      postsPopulated: successfulPopulates,
+      postPopulateErrors: populateResults.filter(r => !r.success),
+      renderBatches: renderResults.filter(r => r.success).map(r => r.batchId),
+      renderBatchErrors: renderResults.filter(r => !r.success),
+      email: { success: emailResult.success },
+      oliviaEmail: { success: oliviaEmailSuccess },
+      warnings,
+      estimatedCompletion,
     });
   } catch (error) {
+    console.error('[dealer-review] Error approving dealer:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to approve dealer' },
       { status: 500 }

@@ -6,6 +6,7 @@ Creates the database schema and imports data from:
 2. Turnkey SM - FOR POSTING - BY REGION.xlsx (scheduling data)
 """
 
+import os
 import sqlite3
 import pandas as pd
 from pathlib import Path
@@ -14,7 +15,8 @@ import re
 import json
 
 # Paths
-EXCEL_DIR = Path("/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+EXCEL_DIR = Path(f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
 DEALERS_FILE = EXCEL_DIR / "Turnkey Social Media - Dealers - Current.xlsm"
 SCHEDULE_FILE = EXCEL_DIR / "Turnkey SM  -  FOR POSTING - BY REGION.xlsx"
 DB_PATH = Path(__file__).parent.parent / "data" / "sqlite" / "creative.db"

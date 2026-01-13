@@ -15,6 +15,7 @@ const DB_PATH = path.join(process.cwd(), 'data', 'sqlite', 'creative.db');
 interface RenderRequest {
   postNumber: number;
   templateId: string;
+  dealerNo?: string;  // Optional: filter to single dealer
 }
 
 interface Dealer {
@@ -75,9 +76,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get all FULL dealers from SQLite with complete creatomate data
+    // Get FULL dealers from SQLite with complete creatomate data
+    // If any request has a dealerNo filter, collect all unique dealer numbers
+    const dealerNos = new Set<string>();
+    for (const req of renderRequests) {
+      if (req.dealerNo) {
+        dealerNos.add(req.dealerNo);
+      }
+    }
+
     const db = new Database(DB_PATH, { readonly: true });
-    const dealers = db.prepare(`
+
+    let query = `
       SELECT dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo
       FROM dealers
       WHERE program_status = 'FULL'
@@ -86,7 +96,18 @@ export async function POST(request: NextRequest) {
         AND creatomate_logo != ''
         AND display_name IS NOT NULL
         AND display_name != ''
-    `).all() as Dealer[];
+    `;
+
+    const params: string[] = [];
+
+    // If specific dealers requested, filter to those
+    if (dealerNos.size > 0) {
+      const placeholders = Array.from(dealerNos).map(() => '?').join(', ');
+      query += ` AND dealer_no IN (${placeholders})`;
+      params.push(...Array.from(dealerNos));
+    }
+
+    const dealers = db.prepare(query).all(...params) as Dealer[];
     db.close();
 
     if (dealers.length === 0) {

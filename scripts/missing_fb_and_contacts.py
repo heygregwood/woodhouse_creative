@@ -3,13 +3,15 @@
 1. List 11 dealers missing Facebook
 2. Import ALL phone/email fields from Excel to dealer_contacts
 """
+import os
 import pandas as pd
 import sqlite3
 import re
 from pathlib import Path
 from datetime import datetime
 
-EXCEL_PATH = Path('/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm')
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+EXCEL_PATH = Path(f'/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm')
 DB_PATH = Path('/home/heygregwood/woodhouse_creative/data/sqlite/creative.db')
 
 def normalize_phone(phone):

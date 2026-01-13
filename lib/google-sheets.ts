@@ -321,3 +321,106 @@ export async function addDealerToSpreadsheet(
 
   return result;
 }
+
+/**
+ * Get active posts from scheduling spreadsheet
+ * Returns posts from row 13+ that have a post number, template ID, and base copy
+ */
+export async function getActivePostsFromSpreadsheet(): Promise<Array<{
+  postNumber: number;
+  templateId: string;
+  baseCopy: string;
+  rowNumber: number;
+}>> {
+  const auth = getGoogleAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  // Read columns A (post number), B (template ID), C (base copy) from row 13 onwards
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: 'Sheet1!A13:C1000'
+  });
+
+  const rows = response.data.values || [];
+  const posts = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const postNumber = parseInt(row[0]);
+    const templateId = row[1]?.trim();
+    const baseCopy = row[2]?.trim();
+
+    if (!isNaN(postNumber) && templateId && baseCopy) {
+      posts.push({
+        postNumber,
+        templateId,
+        baseCopy,
+        rowNumber: 13 + i  // Actual row number in spreadsheet
+      });
+    }
+  }
+
+  console.log(`[google-sheets] Found ${posts.length} active posts in spreadsheet`);
+  return posts;
+}
+
+/**
+ * Populate post copy for a single dealer and post
+ * Replaces {phone}, {website}, {name} variables in baseCopy
+ */
+export async function populatePostCopyForDealer(
+  dealerNo: string,
+  postNumber: number,
+  baseCopy: string,
+  rowNumber: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get dealer data from database
+    const dealer = getDealerFromDb(dealerNo);
+    if (!dealer) {
+      return { success: false, message: `Dealer ${dealerNo} not found in database` };
+    }
+
+    const auth = getGoogleAuth();
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    // Find dealer column in spreadsheet
+    const row1Response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet1!1:1'
+    });
+
+    const row1 = (row1Response.data.values?.[0] || []) as string[];
+    const dealerColIdx = findDealerColumn([row1], dealerNo);
+
+    if (dealerColIdx < 0) {
+      return { success: false, message: `Dealer ${dealerNo} not found in spreadsheet` };
+    }
+
+    const colLetter = colToLetter(dealerColIdx);
+
+    // Replace variables in base copy
+    let personalizedCopy = baseCopy
+      .replace(/{phone}/g, dealer.phone)
+      .replace(/{website}/g, dealer.website)
+      .replace(/{name}/g, dealer.display_name);
+
+    // Write to dealer's column at the post row
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Sheet1!${colLetter}${rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[personalizedCopy]]
+      }
+    });
+
+    console.log(`[google-sheets] Populated post ${postNumber} for dealer ${dealerNo} at ${colLetter}${rowNumber}`);
+    return { success: true, message: `Populated post ${postNumber}` };
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[google-sheets] Failed to populate post ${postNumber} for dealer ${dealerNo}:`, errorMsg);
+    return { success: false, message: errorMsg };
+  }
+}

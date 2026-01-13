@@ -492,3 +492,38 @@ export async function sendContentReadyEmail(
 
   return sendEmail(dealer.contact_email, subject, htmlBody);
 }
+
+/**
+ * Send Onboarding Complete Email to Olivia
+ * Trigger: After dealer approval automation completes
+ */
+export async function sendOnboardingCompleteEmail({
+  dealerNo,
+  dealerName,
+  postsCount,
+  estimatedCompletion,
+  spreadsheetColumn,
+}: {
+  dealerNo: string;
+  dealerName: string;
+  postsCount: number;
+  estimatedCompletion: string;
+  spreadsheetColumn: string;
+}): Promise<EmailResult> {
+  const variables = {
+    dealer_no: dealerNo,
+    dealer_name: dealerName,
+    posts_count: String(postsCount),
+    estimated_completion: estimatedCompletion,
+    drive_folder_url: `https://drive.google.com/drive/folders/1QwyyE9Pq-p8u-TEz7B5nC-14BERpDPmv`,
+    spreadsheet_url: `https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY/edit#gid=0&range=${spreadsheetColumn}1`,
+    spreadsheet_column: spreadsheetColumn,
+  };
+
+  const template = loadTemplate('onboarding_complete');
+  const htmlBody = renderTemplate(template, variables);
+
+  const subject = `New Dealer Onboarded: ${dealerName} (#${dealerNo})`;
+
+  return sendEmail('oliviab731@gmail.com', subject, htmlBody);
+}

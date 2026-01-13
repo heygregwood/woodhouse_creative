@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Deep dive into Creatomate validation sheet - focus on validation columns."""
 
+import os
 import pandas as pd
 from pathlib import Path
 
-CREATOMATE_FILE = Path("/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Creative Automation/Import Creatomate Data Validated.xlsx")
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+CREATOMATE_FILE = Path(f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Creative Automation/Import Creatomate Data Validated.xlsx")
 
 df = pd.read_excel(CREATOMATE_FILE, sheet_name='Data', engine='openpyxl')
 

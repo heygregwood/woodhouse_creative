@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Inspect the scheduling spreadsheet header structure."""
 
+import os
 import pandas as pd
 from pathlib import Path
 
-EXCEL_DIR = Path("/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+EXCEL_DIR = Path(f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database")
 SCHEDULE_FILE = EXCEL_DIR / "Turnkey SM  -  FOR POSTING - BY REGION.xlsx"
 
 # Read Custom North tab - first 15 rows to see header structure

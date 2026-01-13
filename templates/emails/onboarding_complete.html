@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Dealer Onboarded</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+  <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">New Dealer Onboarded: {{dealer_name}}</h2>
+
+  <p>Dealer <strong>#{{dealer_no}}</strong> has been approved and automated onboarding is complete.</p>
+
+  <h3 style="color: #2d3748;">Onboarding Summary</h3>
+  <ul>
+    <li>Added to scheduling spreadsheet (column {{spreadsheet_column}})</li>
+    <li>Post copy populated for {{posts_count}} active posts</li>
+    <li>Render batches created for {{posts_count}} posts</li>
+    <li>FB Admin email sent to dealer</li>
+  </ul>
+
+  <h3 style="color: #2d3748;">Estimated Completion</h3>
+  <p>All renders should complete in approximately <strong>{{estimated_completion}}</strong>.</p>
+
+  <h3 style="color: #2d3748;">Quick Links</h3>
+  <ul>
+    <li><a href="{{spreadsheet_url}}" style="color: #3182ce;">View in Scheduling Spreadsheet</a></li>
+    <li><a href="{{drive_folder_url}}" style="color: #3182ce;">Open Dealer's Drive Folder</a></li>
+  </ul>
+
+  <p style="margin-top: 30px; padding: 15px; background-color: #f7fafc; border-left: 4px solid: #3182ce;">
+    <strong>Next Steps:</strong> The dealer will be notified when their first post is scheduled.
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+
+  <p style="font-size: 12px; color: #718096;">
+    Automated by Woodhouse Creative System
+  </p>
+
+</body>
+</html>

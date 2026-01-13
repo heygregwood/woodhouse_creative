@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +17,10 @@ from pathlib import Path
 import pandas as pd
 
 # Paths
-EXCEL_PATH = "/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm"
+# Get Windows username from environment variable (set in .env.local)
+# Laptop: gregw | Desktop: GregWood
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')  # Default to GregWood for backwards compatibility
+EXCEL_PATH = f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm"
 DB_PATH = Path(__file__).parent.parent / "data" / "sqlite" / "creative.db"
 SHEET_NAME = "Woodhouse Data"
 

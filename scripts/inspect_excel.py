@@ -1,6 +1,8 @@
+import os
 import pandas as pd
 
-file1 = "/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm"
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+file1 = f"/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm"
 
 print("WOODHOUSE DATA - Full Column List:")
 print("="*60)

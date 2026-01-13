@@ -13,13 +13,15 @@ Fields:
 - Creatomate Logo: Google Drive URL
 - Ready for automate: logo resized + all fields validated
 """
+import os
 import pandas as pd
 import sqlite3
 import re
 from pathlib import Path
 from datetime import datetime
 
-EXCEL_PATH = Path('/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/Woodhouse Business/Creative Automation/Import Creatomate Data Validated.xlsx')
+WINDOWS_USERNAME = os.getenv('WINDOWS_USERNAME', 'GregWood')
+EXCEL_PATH = Path(f'/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/Woodhouse Business/Creative Automation/Import Creatomate Data Validated.xlsx')
 DB_PATH = Path('/home/heygregwood/woodhouse_creative/data/sqlite/creative.db')
 
 def clean_str(val):
