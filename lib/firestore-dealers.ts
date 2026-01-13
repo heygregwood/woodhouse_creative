@@ -66,6 +66,7 @@ export interface FirestoreDealer {
   bad_email: number;
   ready_for_automate?: string | null;
   logo_needs_design?: number | null;
+  logo_source?: string | null;
   review_status?: string | null;
 
   // Facebook
