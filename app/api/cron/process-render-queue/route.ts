@@ -94,10 +94,10 @@ export async function GET(request: NextRequest) {
         const { renderId, status } = await createRender({
           templateId: job.templateId,
           businessData: {
-            businessName: dealer.display_name,
-            phone: dealer.creatomate_phone,
-            logoUrl: dealer.creatomate_logo,
-            website: dealer.creatomate_website,
+            businessName: dealer.display_name!,
+            phone: dealer.creatomate_phone!,
+            logoUrl: dealer.creatomate_logo!,
+            website: dealer.creatomate_website || undefined,
           },
           metadata: {
             jobId: job.id,
