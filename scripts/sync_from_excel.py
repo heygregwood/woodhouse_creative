@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
-Sync dealers from Excel (Woodhouse Data tab) to SQLite database.
+LOCAL CLI FALLBACK - Sync dealers from Excel to SQLite database.
+
+NOTE: This script syncs to LOCAL SQLite database only.
+PRIMARY IMPLEMENTATION: Use the admin dashboard instead:
+  - Dashboard: /admin → "Sync from Excel" section
+  - API: GET/POST /api/admin/sync-excel (syncs to Firestore via Microsoft Graph API)
+
+This script is kept for local CLI operations and syncs to SQLite (not Firestore).
 
 Usage:
     python3 scripts/sync_from_excel.py              # Dry run - show changes only

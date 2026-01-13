@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Add a new FULL dealer to the scheduling spreadsheet.
+LOCAL CLI FALLBACK - Add a new FULL dealer to scheduling spreadsheet.
 
-This script adds a new column for a dealer who was just promoted to FULL status.
-It inserts the dealer at the end of the existing dealer columns and populates
-their metadata from the database.
+NOTE: This script reads from LOCAL SQLite database.
+PRIMARY IMPLEMENTATION: Use the admin dashboard or TypeScript instead:
+  - Dashboard: /admin/dealer-review → Auto-adds when approving dealer
+  - TypeScript: lib/google-sheets.ts (addDealerToSpreadsheet)
+
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     python3 scripts/add_dealer_to_spreadsheet.py 10122026

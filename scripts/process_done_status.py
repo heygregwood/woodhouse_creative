@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Process dealers with "Done" status in the scheduling spreadsheet.
+LOCAL CLI FALLBACK - Process dealers with "Done" status in spreadsheet.
 
-This script:
-1. Reads the scheduling spreadsheet
-2. Finds all dealer columns where row 2 = "Done"
-3. Sends the appropriate email (first_post or post_scheduled)
-4. Updates row 2 to "Email Sent"
+NOTE: This script reads from LOCAL SQLite database.
+PRIMARY IMPLEMENTATION: Use the admin dashboard instead:
+  - Dashboard: /admin → "Process Scheduled Emails" section
+  - API: GET/POST /api/admin/process-done
+
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     # Load env vars first

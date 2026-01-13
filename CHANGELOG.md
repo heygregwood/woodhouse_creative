@@ -6,6 +6,60 @@ All notable changes to Woodhouse Creative are documented here.
 
 ---
 
+## [2026-01-13] - Documentation Reorganization & Cleanup
+
+### Added
+- docs: Reorganized documentation into structured subfolders
+  - **New structure:** `docs/engineering/`, `docs/product/`, `docs/playbook/`, `docs/archive/`
+  - **Engineering docs (4 new files):**
+    - `docs/engineering/DATA_MODEL.md` - Merged DATABASE.md + DATA_ARCHITECTURE.md, Firestore schema
+    - `docs/engineering/API_REFERENCE.md` - All 28 API endpoints with request/response formats
+    - `docs/engineering/TYPESCRIPT_MODULES.md` - lib/*.ts documentation
+    - `docs/engineering/PYTHON_SCRIPTS.md` - CLI scripts reference
+  - **Product docs (5 new files):**
+    - `docs/product/ADMIN_DASHBOARD.md` - Dashboard pages and features
+    - `docs/product/DEALER_LIFECYCLE.md` - CONTENT → FULL → REMOVED states
+    - `docs/product/RENDER_PIPELINE.md` - Video rendering workflow
+    - `docs/product/EMAIL_AUTOMATION.md` - 6 email types and triggers
+    - `docs/product/SPREADSHEET_SYSTEM.md` - Google Sheets structure
+  - **Playbook docs (3 new files):**
+    - `docs/playbook/QUICK_COMMANDS.md` - Common commands for daily use
+    - `docs/playbook/DEVELOPMENT_WORKFLOW.md` - Local → Preview → Production
+    - `docs/playbook/TROUBLESHOOTING.md` - Common issues and fixes
+  - **Impact:** Clear organization, easier navigation
+
+### Changed
+- docs: Updated CLAUDE.md with critical sections
+  - **Added:** Machine-specific config (Desktop vs Laptop WINDOWS_USERNAME)
+  - **Added:** Firestore query section with npx tsx examples
+  - **Updated:** Quick Links to point to new docs structure
+  - **Updated:** Current Status to January 2026 with Firestore counts (351 total, 130 FULL)
+  - **Impact:** Correct Firestore queries, laptop sync works
+
+### Removed
+- cleanup: Deleted 52 obsolete Python scripts
+  - **Scripts removed:** Migration, import, validation, testing scripts no longer needed
+  - **Scripts kept (7 + email module):**
+    - batch_render.py, sync_from_excel.py, process_done_status.py
+    - update_dealer_status.py, sync_spreadsheet.py, add_dealer_to_spreadsheet.py
+    - populate_post_copy.py, email_sender/send_email.py, email_sender/blocked_dealers.py
+  - **Impact:** Cleaner scripts directory, reduced confusion
+
+### Files Modified
+1. `docs/README.md` - Complete rewrite with new navigation structure
+2. `CLAUDE.md` - Added Firestore query section, laptop sync fix, updated Quick Links
+3. `docs/engineering/*.md` - 7 files (4 new, 3 moved)
+4. `docs/product/*.md` - 5 new files
+5. `docs/playbook/*.md` - 5 files (3 new, 2 moved)
+6. `docs/archive/*.md` - 4 files moved from root
+
+### Verification
+- All documentation links tested
+- Firestore query examples verified to work with named database
+- Laptop WINDOWS_USERNAME config documented
+
+---
+
 ## [2026-01-12] - Automated Dealer Onboarding Workflow
 
 ### Added

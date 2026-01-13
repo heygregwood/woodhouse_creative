@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Populate personalized post copy for all dealers in the scheduling spreadsheet.
+LOCAL CLI FALLBACK - Populate personalized post copy for all dealers.
 
-Reads base copy from column C for a given post row, replaces variables with
-dealer-specific values, and writes to each dealer's column.
+NOTE: This script reads from LOCAL SQLite database.
+PRIMARY IMPLEMENTATION: Use the admin dashboard instead:
+  - Dashboard: /admin → "Populate Post Copy" section
+  - API: POST /api/admin/populate-post-copy
+  - TypeScript: lib/google-sheets.ts (populatePostCopyForDealer)
 
-Variables supported:
-  {phone} - Dealer's phone number (from row 9)
-  {website} - Dealer's website (from row 8)
-  {name} - Dealer's display name (from row 11)
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     python3 scripts/populate_post_copy.py --post 666

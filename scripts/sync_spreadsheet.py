@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Sync scheduling spreadsheet with SQLite database (source of truth).
+LOCAL CLI FALLBACK - Sync scheduling spreadsheet with database.
 
-Two functions:
-1. Populate dealer metadata (rows 8-11) from database based on dealer_no match
-2. Populate personalized post copy using database values (not spreadsheet values)
+NOTE: This script reads from LOCAL SQLite database.
+PRIMARY IMPLEMENTATION: Use the admin dashboard instead:
+  - Dashboard: /admin → "Populate Post Copy" section
+  - API: GET/POST /api/admin/populate-post-copy
+  - TypeScript: lib/google-sheets.ts
+
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     python3 scripts/sync_spreadsheet.py --sync-dealers          # Sync dealer metadata

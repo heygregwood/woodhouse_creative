@@ -215,6 +215,47 @@ gpush     # git push
 ga        # git add .
 ```
 
+### Machine-Specific Config (Desktop vs Laptop)
+
+| Machine | WINDOWS_USERNAME | Notes |
+|---------|-----------------|-------|
+| Desktop | GregWood | Default in sync_from_excel.py |
+| Laptop | gregw | Must set in .env.local |
+
+The `WINDOWS_USERNAME` env var determines the OneDrive path for Excel sync:
+`/mnt/c/Users/{WINDOWS_USERNAME}/OneDrive - woodhouseagency.com/...`
+
+**On Laptop:** Add to `.env.local`:
+```env
+WINDOWS_USERNAME=gregw
+```
+
+### Querying Firestore
+
+**IMPORTANT:** Use `npx tsx` with library imports, NOT standalone scripts. The app uses a named database `woodhouse-creative-db`, not the default database.
+
+```bash
+# Set environment first
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+
+# Count dealers
+npx tsx -e "
+import { getDealers } from './lib/firestore-dealers';
+const all = await getDealers();
+console.log('Total:', all.length, '- FULL:', all.filter(d => d.program_status === 'FULL').length);
+"
+
+# Get specific dealer
+npx tsx -e "
+import { getDealer } from './lib/firestore-dealers';
+const d = await getDealer('10251015');
+console.log(JSON.stringify(d, null, 2));
+"
+```
+
+**WRONG:** Do NOT use standalone scripts with `admin.firestore()` - this queries the wrong database.
+
 ---
 
 ## TypeScript & Coding Standards
@@ -300,35 +341,42 @@ import type { Dealer } from '@/lib/types/dealer';
 
 ## Quick Links
 
-| Document | Purpose |
-|----------|---------|
-| `docs/END_TO_END_DOCUMENTATION_DRAFT.md` | **Full automation roadmap, API specs, implementation plan** |
-| `docs/DATABASE.md` | Database schema, field logic, import scripts |
-| `docs/DATA_ARCHITECTURE.md` | Data model overview, Excel structure |
-| `docs/WORKFLOW_CURRENT.md` | Current 9-step manual workflow |
-| `scripts/` | Python scripts for data import and validation |
-| `data/sqlite/creative.db` | Local SQLite database |
+| Need to... | Go to |
+|------------|-------|
+| Understand the system | `docs/README.md` - Start here |
+| Query Firestore | `docs/playbook/QUICK_COMMANDS.md` |
+| Check data schema | `docs/engineering/DATA_MODEL.md` |
+| API endpoints | `docs/engineering/API_REFERENCE.md` |
+| Troubleshoot issues | `docs/playbook/TROUBLESHOOTING.md` |
+| Email automation | `docs/product/EMAIL_AUTOMATION.md` |
+| Python scripts | `docs/engineering/PYTHON_SCRIPTS.md` |
+
+### Documentation Structure
+```
+docs/
+├── engineering/     # DATA_MODEL, API_REFERENCE, TYPESCRIPT_MODULES, PYTHON_SCRIPTS
+├── product/         # ADMIN_DASHBOARD, DEALER_LIFECYCLE, EMAIL_AUTOMATION
+├── playbook/        # QUICK_COMMANDS, TROUBLESHOOTING, DEVELOPMENT_WORKFLOW
+└── archive/         # Historical plans and completed docs
+```
 
 ---
 
-## Current Status (December 2025)
+## Current Status (January 2026)
 
-### 124 FULL Dealers - Data Complete
+### Database: Firestore (woodhouse-creative-db)
 
-| Field | Count | Status |
-|-------|-------|--------|
-| Display Name | 124/124 | Complete |
-| Phone | 124/124 | Complete |
-| Website | 121/124 | 3 dealers have no website (expected) |
-| Logo (Google Drive) | 124/124 | Complete - all validated |
-| Facebook ID | 124/124 | Complete |
-| **Ready for Automation** | **124/124** | All ready |
+| Metric | Count | Notes |
+|--------|-------|-------|
+| **Total Dealers** | 351 | Firestore source of truth |
+| **FULL Dealers** | 130 | Ready for full automation |
+| **CONTENT Dealers** | 221 | Content only |
+| **Ready for Automate** | 130/130 | All FULL dealers ready |
 
-### Batch Rendering Complete
-- **Posts 666-672 Complete:** 882 videos rendered (Dec 22, 2025)
-- All videos uploaded to Google Drive dealer folders
+### Batch Rendering
 - Cron processes 25 jobs/minute (Creatomate rate limit: 30 req/10s)
-- Script: `scripts/batch_render.py`
+- Videos uploaded to Google Drive dealer folders
+- Old posts auto-archived when new renders complete
 
 ---
 

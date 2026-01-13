@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-Update dealer program status (CONTENT <-> FULL) based on Facebook admin access.
+LOCAL CLI FALLBACK - Update dealer program status (CONTENT <-> FULL).
 
-When a dealer grants FB admin access:
-  - Updates SQLite: program_status = 'FULL'
-  - Adds to scheduling spreadsheet
-  - Creates Google Drive folder
-  - Flags for logo upload (needs_logo = 1)
+NOTE: This script updates LOCAL SQLite database only.
+PRIMARY IMPLEMENTATION: Use the admin dashboard instead:
+  - Dashboard: /admin/dealer-review → Approve/reject dealers
+  - API: POST /api/admin/dealer-status
 
-When a dealer removes FB admin access:
-  - Updates SQLite: program_status = 'CONTENT'
-  - Removes from scheduling spreadsheet
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     python3 scripts/update_dealer_status.py --promote "Frank Devos National Heating and Cooling"

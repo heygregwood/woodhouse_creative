@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Batch render videos for all FULL dealers using Creatomate API.
+LOCAL CLI FALLBACK - Batch render videos for all FULL dealers.
 
-Reads dealer data from SQLite, triggers renders via Creatomate API,
-polls for completion, and uploads finished videos to Google Drive.
+NOTE: This script reads from LOCAL SQLite database.
+PRIMARY IMPLEMENTATION: Use the admin dashboard or API route instead:
+  - Dashboard: /admin → "Batch Render" section
+  - API: POST /api/creative/render-batch
+
+This script is kept for local CLI operations when Vercel is unavailable.
 
 Usage:
     python3 scripts/batch_render.py --post 700 --template abc123
