@@ -3,7 +3,37 @@
 **Purpose:** Internal creative automation for Woodhouse Agency Allied Air dealers
 **Status:** Active - 124 FULL dealers ready for automation
 **Deployed:** https://woodhouse-creative.vercel.app
-**Last Updated:** January 9, 2026
+**Last Updated:** January 12, 2026
+
+---
+
+## Current Work In Progress: Dealer Onboarding Automation
+
+**Plan:** [docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md](docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md)
+**Goal:** Reduce onboarding from 15 min to <1 min per dealer
+
+### Completed (Commit 17e89f7)
+
+| Phase | Description | Files Changed |
+|-------|-------------|---------------|
+| 1A | Website field optional | `dealer-review/page.tsx:217`, `dealer-review/route.ts:86` |
+| 1B | Facebook logo in search | `fetch-logos/route.ts:178-238`, `lib/creatomate.ts:145-208` |
+| 2 (API) | One-click logo save API | `save-logo-permanent/route.ts` (NEW), `lib/google-drive.ts:388-414` |
+
+### Remaining Work
+
+| Phase | Description | Priority |
+|-------|-------------|----------|
+| 2 (UI) | Add "Save Permanently & Auto-Fill" button | High |
+| 3 | Automatic post-approval actions (spreadsheet, renders, emails) | High |
+| - | Run `npx tsx scripts/init-firestore-posts.ts` to init posts collection | Medium |
+| - | Final documentation updates | Low |
+
+### Key Files for Continuation
+
+- **Plan:** `docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md` - Full implementation details
+- **Template Mapping:** `scripts/posts-template-mapping.json` - 28 post→template mappings
+- **Init Script:** `scripts/init-firestore-posts.ts` - Populate Firestore posts collection
 
 ---
 

@@ -1,15 +1,55 @@
 # Implementation Plan: Automated Dealer Onboarding Workflow
 
-**Status:** Ready for Implementation
+**Status:** IN PROGRESS - Phases 1A, 1B, 2 (API) Complete
 **Created:** January 9, 2026
-**Last Updated:** January 9, 2026
-**Verified Against:** Current codebase on January 9, 2026
+**Last Updated:** January 12, 2026
+**Verified Against:** Current codebase on January 12, 2026
 
 **Related Documentation:**
 - [DOCUMENTATION_IMPROVEMENT_PLAN.md](DOCUMENTATION_IMPROVEMENT_PLAN.md) - Documentation standards to follow
 - [EXCEL_SYNC_REFERENCE.md](EXCEL_SYNC_REFERENCE.md) - Excel column mapping reference
 - [CHANGELOG.md](../CHANGELOG.md) - Record implementation changes here
 - [README.md](README.md) - Documentation index
+
+---
+
+## Implementation Status
+
+| Phase | Description | Status | Commit |
+|-------|-------------|--------|--------|
+| 1A | Make website field optional | ✅ Complete | `17e89f7` |
+| 1B | Add Facebook profile picture to logo search | ✅ Complete | `17e89f7` |
+| 2 (API) | One-click logo save API endpoint | ✅ Complete | `17e89f7` |
+| 2 (UI) | UI button for one-click logo save | ⏳ Pending | - |
+| 3 | Automatic post-approval actions | ⏳ Pending | - |
+| - | Initialize Firestore posts collection | ⏳ Pending | - |
+| - | Update documentation | ⏳ Pending | - |
+
+### Completed Files (Commit 17e89f7)
+
+**Phase 1A - Website Optional:**
+- `app/admin/dealer-review/page.tsx:217` - Removed website from validation
+- `app/api/admin/dealer-review/route.ts:86` - Default website to empty string
+
+**Phase 1B - Facebook Logo Search:**
+- `app/api/admin/fetch-logos/route.ts:178-190` - Query Firestore for `facebook_page_id`
+- `app/api/admin/fetch-logos/route.ts:221-238` - Add Facebook Graph API call
+- `lib/creatomate.ts:145-208` - Added `listTemplates()` and `getTemplateIdByPostNumber()`
+
+**Phase 2 - One-Click Logo Save (API only):**
+- `app/api/admin/save-logo-permanent/route.ts` - NEW: Move logo from staging → permanent
+- `lib/google-drive.ts:388-414` - Added `getFileShareableLink()` function
+
+**Posts Collection Infrastructure:**
+- `scripts/posts-template-mapping.json` - Template IDs for 28 posts
+- `scripts/init-firestore-posts.ts` - Script to initialize Firestore
+
+### Remaining Work
+
+1. **Phase 2 UI** - Add "Save Permanently & Auto-Fill" button to dealer-review page
+2. **Phase 3** - Orchestrate post-approval actions (spreadsheet, post copy, renders, emails)
+3. **Initialize Firestore** - Run `npx tsx scripts/init-firestore-posts.ts`
+4. **Documentation** - Update CLAUDE.md and CHANGELOG.md
 
 ---
 
