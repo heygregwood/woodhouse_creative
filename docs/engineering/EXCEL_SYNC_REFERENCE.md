@@ -1,10 +1,29 @@
 # Excel Sync Column Mapping Reference
 
-**Last Updated:** January 9, 2026
-**Code Reference:** [lib/sync-excel.ts](../lib/sync-excel.ts) lines 82-113
-**Excel File:** `Turnkey Social Media - Dealers - Current.xlsm` (OneDrive)
+**Last Updated:** January 13, 2026
+**Code Reference:** [lib/sync-excel.ts](../../lib/sync-excel.ts) lines 85-112
+**Auth Module:** [lib/microsoft-auth.ts](../../lib/microsoft-auth.ts)
+**Excel File:** `Turnkey Social Media - Dealers - Current.xlsm`
 **SharePoint Path:** `/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/`
-**Last Verified:** January 9, 2026 - Manually checked against actual Excel file
+**Last Verified:** January 13, 2026 - Tested via Microsoft Graph API
+
+---
+
+## Authentication
+
+Excel sync uses Microsoft Graph API with OAuth2 device code flow.
+
+**Token Cache:** `.microsoft-token-cache.json` (committed to repo for multi-machine sync)
+**Token Lifetime:** Up to 90 days (auto-refreshes using refresh token)
+**Re-auth:** Only needed every 90 days or after token revocation
+
+**First-time setup on new machine:**
+```bash
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+npx tsx scripts/test-microsoft-auth.ts
+# Visit microsoft.com/devicelogin and enter the code shown
+```
 
 ---
 
@@ -122,13 +141,35 @@ grep -n "dealer_no:" lib/sync-excel.ts
 To verify column mapping is correct:
 
 ```bash
-# 1. Run dry-run sync
-npm run dev
-# Then visit http://localhost:3000/admin
-# Click "Sync from Excel" - should show 340 unchanged, 0 new, 0 removed
+# 1. Test via CLI (preferred)
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+npx tsx -e "
+import { syncFromExcel } from './lib/sync-excel';
+const { changes } = await syncFromExcel(false);
+console.log('New:', changes.new.length);
+console.log('Removed:', changes.removed.length);
+console.log('Updated:', changes.updated.length);
+console.log('Unchanged:', changes.unchanged.length);
+"
 
-# 2. Check logs for correct dealer numbers
+# 2. Or via admin dashboard
+npm run dev
+# Visit http://localhost:3000/admin
+# Click "Sync from Excel" - should show ~342 unchanged, 0 new, 0 removed
+
+# 3. Check logs for correct dealer numbers
 # Should see dealer numbers like "10122026", not status values like "CONTENT"
 ```
 
 If you see "CONTENT", "FULL", or "NEW" as dealer numbers in logs, the column mapping is wrong.
+
+---
+
+## Change History
+
+| Date | Change | Files Updated | Reason |
+|------|--------|---------------|--------|
+| 2026-01-13 | Switched to MSAL OAuth2 device code flow | `microsoft-auth.ts`, `sync-excel.ts` | Enable multi-machine auth with 90-day tokens |
+| 2026-01-09 | Fixed `dealer_no` from index 0 to 3 | `lib/sync-excel.ts`, this doc | Bug fix: parser reading wrong column |
+| 2026-01-09 | Created this reference doc | New file | Prevent future column mapping bugs |

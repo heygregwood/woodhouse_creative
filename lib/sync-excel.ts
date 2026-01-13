@@ -3,17 +3,13 @@
  * Replaces Python script sync_from_excel.py
  *
  * Uses Microsoft Graph API to read Excel file directly from SharePoint
+ * Requires device code authentication (delegated permissions) for Excel API access
  */
 
 import { Client } from '@microsoft/microsoft-graph-client';
-import { ClientSecretCredential } from '@azure/identity';
+import { getAuthenticatedGraphClient, hasValidToken } from './microsoft-auth';
 import { createDealer, updateDealer, markDealerRemoved, getDealers } from './firestore-dealers';
 import type { FirestoreDealer } from './firestore-dealers';
-
-// Microsoft Azure credentials
-const TENANT_ID = process.env.MICROSOFT_TENANT_ID || '';
-const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
 
 // SharePoint file location
 // URL: https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4
@@ -75,6 +71,13 @@ export interface SyncChanges {
   unchanged: string[];
 }
 
+/**
+ * Check if we have valid authentication for Excel sync
+ */
+export function isAuthenticated(): boolean {
+  return hasValidToken();
+}
+
 // Column mapping: Excel column index -> field name
 // Based on actual Excel structure from header row
 const COLUMN_INDICES = {
@@ -119,25 +122,12 @@ const TRACKED_FIELDS = [
   'allied_status',
 ];
 
-function getMicrosoftGraphClient(): Client {
-  if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error('Missing Microsoft Azure credentials. Set MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, and MICROSOFT_CLIENT_SECRET environment variables.');
-  }
-
-  // Create Azure AD credential using client secret
-  const credential = new ClientSecretCredential(TENANT_ID, CLIENT_ID, CLIENT_SECRET);
-
-  // Create Graph client with token credential authentication
-  const client = Client.initWithMiddleware({
-    authProvider: {
-      getAccessToken: async () => {
-        const token = await credential.getToken(['https://graph.microsoft.com/.default']);
-        return token?.token || '';
-      },
-    },
-  });
-
-  return client;
+/**
+ * Get Microsoft Graph client with delegated authentication
+ * Uses device code flow - requires user to authenticate first
+ */
+async function getMicrosoftGraphClient(): Promise<Client> {
+  return await getAuthenticatedGraphClient();
 }
 
 function parseExcelRow(row: any[]): ExcelRow | null {
@@ -201,7 +191,7 @@ function parseExcelRow(row: any[]): ExcelRow | null {
 }
 
 export async function readExcelData(): Promise<Map<string, ExcelRow>> {
-  const client = getMicrosoftGraphClient();
+  const client = await getMicrosoftGraphClient();
 
   try {
     // Get the user's drive ID first

@@ -9,7 +9,7 @@
 
 ## Current Work In Progress: Dealer Onboarding Automation
 
-**Plan:** [docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md](docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md)
+**Plan:** [docs/archive/DEALER_ONBOARDING_AUTOMATION_PLAN.md](docs/archive/DEALER_ONBOARDING_AUTOMATION_PLAN.md)
 **Goal:** Reduce onboarding from 15 min to <1 min per dealer
 
 ### Completed (Commit 17e89f7)
@@ -31,7 +31,7 @@
 
 ### Key Files for Continuation
 
-- **Plan:** `docs/DEALER_ONBOARDING_AUTOMATION_PLAN.md` - Full implementation details
+- **Plan:** `docs/archive/DEALER_ONBOARDING_AUTOMATION_PLAN.md` - Full implementation details
 - **Template Mapping:** `scripts/posts-template-mapping.json` - 28 post→template mappings
 - **Init Script:** `scripts/init-firestore-posts.ts` - Populate Firestore posts collection
 
@@ -230,6 +230,14 @@ The `WINDOWS_USERNAME` env var determines the OneDrive path for Excel sync:
 WINDOWS_USERNAME=gregw
 ```
 
+**Claude: Detect Current Machine**
+At the start of a session, Claude can check which machine is active:
+```bash
+grep WINDOWS_USERNAME .env.local
+# gregw = laptop, GregWood = desktop
+```
+This helps Claude understand environment constraints (e.g., Excel sync only works on desktop).
+
 ### Querying Firestore
 
 **IMPORTANT:** Use `npx tsx` with library imports, NOT standalone scripts. The app uses a named database `woodhouse-creative-db`, not the default database.
@@ -350,14 +358,48 @@ import type { Dealer } from '@/lib/types/dealer';
 | Troubleshoot issues | `docs/playbook/TROUBLESHOOTING.md` |
 | Email automation | `docs/product/EMAIL_AUTOMATION.md` |
 | Python scripts | `docs/engineering/PYTHON_SCRIPTS.md` |
+| TypeScript modules | `docs/engineering/TYPESCRIPT_MODULES.md` |
+| Excel sync details | `docs/engineering/EXCEL_SYNC_REFERENCE.md` |
+| Excel VBA macros | `docs/engineering/EXCEL_VBA_MACROS.md` |
+| Dealer naming rules | `docs/engineering/DEALER_NAMES.md` |
+| Migration history | `docs/engineering/MIGRATION_HISTORY.md` |
+| Render pipeline | `docs/product/RENDER_PIPELINE.md` |
+| Spreadsheet system | `docs/product/SPREADSHEET_SYSTEM.md` |
+| Dealer lifecycle | `docs/product/DEALER_LIFECYCLE.md` |
+| Admin dashboard | `docs/product/ADMIN_DASHBOARD.md` |
+| Development workflow | `docs/playbook/DEVELOPMENT_WORKFLOW.md` |
+| Compliance guide | `docs/playbook/COMPLIANCE_GUIDE.md` |
 
 ### Documentation Structure
 ```
 docs/
-├── engineering/     # DATA_MODEL, API_REFERENCE, TYPESCRIPT_MODULES, PYTHON_SCRIPTS
-├── product/         # ADMIN_DASHBOARD, DEALER_LIFECYCLE, EMAIL_AUTOMATION
-├── playbook/        # QUICK_COMMANDS, TROUBLESHOOTING, DEVELOPMENT_WORKFLOW
-└── archive/         # Historical plans and completed docs
+├── README.md                    # Start here - system overview
+├── engineering/                 # Technical implementation details
+│   ├── API_REFERENCE.md         # All API endpoints
+│   ├── DATA_MODEL.md            # Database schema (Firestore)
+│   ├── DEALER_NAMES.md          # Naming conventions
+│   ├── EXCEL_SYNC_REFERENCE.md  # Excel column mappings
+│   ├── EXCEL_VBA_MACROS.md      # Allied Air VBA integration
+│   ├── MIGRATION_HISTORY.md     # Database migrations
+│   ├── PYTHON_SCRIPTS.md        # Script documentation
+│   └── TYPESCRIPT_MODULES.md    # TS module docs
+├── product/                     # Feature documentation
+│   ├── ADMIN_DASHBOARD.md       # Dashboard features
+│   ├── DEALER_LIFECYCLE.md      # Dealer states/transitions
+│   ├── EMAIL_AUTOMATION.md      # Email system
+│   ├── RENDER_PIPELINE.md       # Video rendering
+│   └── SPREADSHEET_SYSTEM.md    # Google Sheets integration
+├── playbook/                    # Operational guides
+│   ├── COMPLIANCE_GUIDE.md      # Compliance rules
+│   ├── COMPLIANCE_WOODHOUSE.md  # Woodhouse-specific compliance
+│   ├── DEVELOPMENT_WORKFLOW.md  # Dev process
+│   ├── QUICK_COMMANDS.md        # Common commands
+│   └── TROUBLESHOOTING.md       # Problem solving
+└── archive/                     # Historical/completed docs
+    ├── DEALER_ONBOARDING_AUTOMATION_PLAN.md
+    ├── DOCUMENTATION_IMPROVEMENT_PLAN.md
+    ├── END_TO_END_DOCUMENTATION_DRAFT.md
+    └── WORKFLOW_CURRENT.md
 ```
 
 ---
@@ -608,13 +650,11 @@ woodhouse_creative/
 │   │   └── creative.db         # SQLite database (source of truth)
 │   └── full_dealers_for_creatomate.csv
 ├── docs/
-│   ├── END_TO_END_DOCUMENTATION_DRAFT.md
-│   ├── DATABASE.md
-│   ├── DATA_ARCHITECTURE.md
-│   ├── WORKFLOW_CURRENT.md
-│   ├── COMPLIANCE_GUIDE.md
-│   ├── COMPLIANCE_WOODHOUSE_CREATIVE.md
-│   └── DEALER_NAMES.md
+│   ├── README.md               # Start here
+│   ├── engineering/            # Technical docs (7 files)
+│   ├── product/                # Feature docs (5 files)
+│   ├── playbook/               # Operational guides (5 files)
+│   └── archive/                # Historical docs (4 files)
 ├── public/
 │   └── template-bg.png         # Video template background for QA
 └── logs/                       # Script execution logs
@@ -882,63 +922,78 @@ All validated for video generation:
 
 ---
 
-## Excel Sync Limitations (Important)
+## Excel Sync (Microsoft Graph API)
 
-The "Sync from Excel" functionality works **LOCAL ONLY** and does **NOT** work on Vercel production.
+Excel sync now works on both localhost and Vercel using Microsoft Graph API with OAuth2 device code flow.
 
-### Why Local Only?
+### How It Works
 
-The Excel file is stored on SharePoint OneDrive at:
 ```
-/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm
+SharePoint Excel → Microsoft Graph API → TypeScript Parser → Firestore
 ```
 
-**Challenge:** The file contains VBA macros (FindNewDealers, PostProgramStatus) that are critical to the workflow and only work in desktop Excel.
+**Authentication:** OAuth2 device code flow with MSAL
+- Token cached in `.microsoft-token-cache.json` (committed to repo)
+- Refresh tokens last up to 90 days
+- Re-authentication only needed every 90 days
 
-### What We Tried
+### First-Time Setup (New Machine)
 
-**Attempt 1: TypeScript + Microsoft Graph API**
-- Created Azure App Registration: "Woodhouse Creative Automation"
-- Added Files.Read.All and Sites.Read.All (application permissions)
-- Granted admin consent
-- Implemented [lib/sync-excel.ts](lib/sync-excel.ts) using `@microsoft/microsoft-graph-client`
-- **Result:** Failed - Excel API workbook endpoints require delegated permissions (user context), NOT supported with app-only authentication
+```bash
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+npx tsx scripts/test-microsoft-auth.ts
+# Visit microsoft.com/devicelogin and enter the code shown
+# Sign in with greg@woodhouseagency.com
+```
 
-**Attempt 2: Download file with Graph API, parse with xlsx library**
-- Used `/drives/{id}/items/{fileId}/content` endpoint to download the Excel file
-- Used `xlsx` library to parse the downloaded file
-- **Result:** Failed - Same "General exception while processing" error, application permissions not sufficient
-
-### Current Solution
-
-The API route [app/api/admin/sync-excel/route.ts](app/api/admin/sync-excel/route.ts) uses Python script [scripts/sync_from_excel.py](scripts/sync_from_excel.py):
-- Works locally because Python reads from WSL-mounted OneDrive: `/mnt/c/Users/GregWood/OneDrive - woodhouseagency.com/...`
-- Spawns Python subprocess via Node.js `child_process.spawn`
-- **Limitation:** Python not available on Vercel serverless functions ("spawn python3 ENOENT")
+After authenticating, pull the `.microsoft-token-cache.json` to other machines to share the auth session.
 
 ### Environment Variables
 
-Even though Graph API didn't work, the credentials are documented in [.env.example](.env.example):
 ```env
-MICROSOFT_TENANT_ID=your-tenant-id
-MICROSOFT_CLIENT_ID=your-client-id
-MICROSOFT_CLIENT_SECRET=your-client-secret
+MICROSOFT_TENANT_ID=6e2ff6f5-2943-474f-a4ae-cd7566bb8ccc
+MICROSOFT_CLIENT_ID=7a9582ea-4528-4667-ac11-2e559723a565
 SHAREPOINT_OWNER_EMAIL=greg@woodhouseagency.com
 SHAREPOINT_FILE_PATH=/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm
 ```
 
 ### Using Sync from Excel
 
-**Works:** `http://localhost:3000/admin` - Click "Sync from Excel" button
-**Doesn't work:** `https://woodhouse-creative.vercel.app/admin` - Button will fail with error
-
-**Manual sync via terminal:**
+**Via CLI (preferred):**
 ```bash
 cd ~/woodhouse_creative
 set -a && source .env.local && set +a
-python3 scripts/sync_from_excel.py          # Dry run (preview changes)
-python3 scripts/sync_from_excel.py --apply  # Apply changes to database
+npx tsx -e "
+import { syncFromExcel } from './lib/sync-excel';
+const { changes } = await syncFromExcel(false);  // Dry run
+console.log('New:', changes.new.length);
+console.log('Removed:', changes.removed.length);
+console.log('Updated:', changes.updated.length);
+"
 ```
+
+**Via Admin Dashboard:**
+- Works on localhost: `http://localhost:3000/admin`
+- Works on production: `https://woodhouse-creative.vercel.app/admin`
+
+### Token Management
+
+```bash
+# Check token status
+npx tsx scripts/test-microsoft-auth.ts --status
+
+# Force re-authentication
+npx tsx scripts/test-microsoft-auth.ts --clear
+npx tsx scripts/test-microsoft-auth.ts
+```
+
+### Related Files
+
+- [lib/microsoft-auth.ts](lib/microsoft-auth.ts) - OAuth2 device code authentication
+- [lib/sync-excel.ts](lib/sync-excel.ts) - Excel sync implementation
+- [docs/engineering/EXCEL_SYNC_REFERENCE.md](docs/engineering/EXCEL_SYNC_REFERENCE.md) - Column mapping
+- [docs/engineering/EXCEL_VBA_MACROS.md](docs/engineering/EXCEL_VBA_MACROS.md) - VBA macro documentation
 
 ---
 

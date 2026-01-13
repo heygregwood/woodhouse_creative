@@ -1,26 +1,97 @@
-# Laptop Sync Test
+# Laptop Sync Instructions
 
-**Purpose:** Verify laptop can pull and run safely after documentation reorganization.
+**Purpose:** Instructions for syncing to laptop after Microsoft OAuth2 implementation.
+**Updated:** January 13, 2026
 
 ---
 
-## Safe Tests (No Production Impact)
+## What Changed
 
-### 1. Verify WINDOWS_USERNAME Works
+Excel sync now uses Microsoft Graph API with OAuth2 device code flow instead of Python + WSL.
+
+**Key Files Added/Changed:**
+- `lib/microsoft-auth.ts` - OAuth2 device code authentication (NEW)
+- `lib/sync-excel.ts` - Now uses Graph API instead of Python
+- `.microsoft-token-cache.json` - Token cache (committed to repo)
+- `scripts/test-microsoft-auth.ts` - Auth test/management CLI (NEW)
+
+---
+
+## First-Time Laptop Setup
+
+### Step 1: Pull Latest Code
+```bash
+cd ~/woodhouse_creative
+git pull origin main
+npm install  # In case new dependencies added
+```
+
+### Step 2: Verify .env.local
+Make sure laptop's `.env.local` has these Microsoft vars (should already be there):
+```env
+MICROSOFT_TENANT_ID="6e2ff6f5-2943-474f-a4ae-cd7566bb8ccc"
+MICROSOFT_CLIENT_ID="7a9582ea-4528-4667-ac11-2e559723a565"
+SHAREPOINT_OWNER_EMAIL="greg@woodhouseagency.com"
+SHAREPOINT_FILE_PATH="/Woodhouse Business/Woodhouse_Agency/Clients/AAE/Turnkey Social Media/Dealer Database/Turnkey Social Media - Dealers - Current.xlsm"
+```
+
+Also make sure `WINDOWS_USERNAME` is correct for laptop:
+```env
+WINDOWS_USERNAME="gregw"
+```
+
+### Step 3: Test Token Cache
+The token cache file `.microsoft-token-cache.json` was committed from desktop. Test if it works:
+
 ```bash
 cd ~/woodhouse_creative
 set -a && source .env.local && set +a
-
-# Check the env var is set
-echo $WINDOWS_USERNAME
-# Should show: gregw (on laptop)
-
-# Test Excel path resolves (dry run only)
-python3 scripts/sync_from_excel.py
-# Should show preview of changes, NOT apply them
+npx tsx scripts/test-microsoft-auth.ts --status
 ```
 
-### 2. Test Firestore Query (Read-Only)
+**Expected output:**
+```
+Token status: Valid token cached
+Cached account: greg@woodhouseagency.com
+```
+
+If you see this, skip to Step 5.
+
+### Step 4: Re-authenticate (Only If Needed)
+If Step 3 shows "No valid token", the cached token expired or didn't transfer correctly. Re-authenticate:
+
+```bash
+npx tsx scripts/test-microsoft-auth.ts
+```
+
+This will:
+1. Display a code (e.g., `ABCD1234`)
+2. Ask you to visit `microsoft.com/devicelogin`
+3. Enter the code and sign in with `greg@woodhouseagency.com`
+
+After authenticating, the new token will be cached for 90 days.
+
+### Step 5: Test Excel Sync
+```bash
+npx tsx -e "
+import { syncFromExcel } from './lib/sync-excel';
+const { changes } = await syncFromExcel(false);
+console.log('New:', changes.new.length);
+console.log('Removed:', changes.removed.length);
+console.log('Updated:', changes.updated.length);
+console.log('Unchanged:', changes.unchanged.length);
+"
+```
+
+**Expected output:**
+```
+New: 0
+Removed: 0
+Updated: 0
+Unchanged: 342
+```
+
+### Step 6: Test Firestore (Read-Only)
 ```bash
 npx tsx -e "
 import { getDealers } from './lib/firestore-dealers';
@@ -28,106 +99,78 @@ const all = await getDealers();
 console.log('Total:', all.length, '- FULL:', all.filter(d => d.program_status === 'FULL').length);
 "
 ```
-Should show: `Total: 351 - FULL: 130`
 
-### 3. Verify Docs Structure
-```bash
-ls docs/engineering/
-ls docs/product/
-ls docs/playbook/
-```
+**Expected:** `Total: ~350 - FULL: ~130`
 
-### 4. Test Dev Server Starts
+### Step 7: Test Dev Server
 ```bash
 npm run dev
 # Visit http://localhost:3000/admin
-# Should load without errors
+# Click "Sync from Excel" - should work without errors
 ```
 
 ---
 
-## What NOT To Do
-- Don't run `--apply` on sync_from_excel.py
+## Token Management Commands
+
+```bash
+# Check token status
+npx tsx scripts/test-microsoft-auth.ts --status
+
+# Run full auth test (tests Graph API access)
+npx tsx scripts/test-microsoft-auth.ts
+
+# Force re-authentication (clears cache)
+npx tsx scripts/test-microsoft-auth.ts --clear
+npx tsx scripts/test-microsoft-auth.ts
+```
+
+---
+
+## Token Sharing Between Machines
+
+The token cache is committed to the repo, so both machines share the same auth session:
+
+**Desktop authenticates → commits → laptop pulls → laptop uses same token**
+
+Token lifetime: Up to 90 days (refresh token).
+
+If token expires on one machine and you re-authenticate, commit and push the new `.microsoft-token-cache.json` so the other machine gets it too.
+
+---
+
+## What NOT To Do on Laptop
+
+Unless intentionally testing:
+- Don't run sync with `apply: true`
 - Don't click "Populate All" or "Process All" buttons
-- Don't approve any dealers in dealer-review
-- Don't send any emails
+- Don't approve dealers in dealer-review
+- Don't send emails
 
 ---
 
-## Test Results
+## Troubleshooting
 
-**Executed:** January 13, 2026
-
-### Test 1: WINDOWS_USERNAME ✅ PASS
+### "No cached accounts found"
+Token cache didn't transfer correctly. Re-authenticate:
 ```bash
-$ echo $WINDOWS_USERNAME
-gregw
+npx tsx scripts/test-microsoft-auth.ts --clear
+npx tsx scripts/test-microsoft-auth.ts
 ```
-**Result:** Environment variable correctly set for laptop
 
-### Test 1b: Excel Sync Path ⚠️ PARTIAL
-```bash
-$ python3 scripts/sync_from_excel.py
-ModuleNotFoundError: No module named 'pandas'
+### "Service account object must contain..."
+Missing Firebase env vars. Check `.env.local` has:
+```env
+NEXT_PUBLIC_FIREBASE_PROJECT_ID="woodhouse-social"
+FIREBASE_CLIENT_EMAIL="firebase-adminsdk-..."
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
 ```
-**Result:** Path configuration correct, but pandas not installed
-**Note:** This is expected on fresh sync. Excel sync works on desktop only.
 
-### Test 2: Firestore Query ✅ PASS (Re-tested)
-```bash
-$ npx tsx -e "import { getDealers } from './lib/firestore-dealers.js'; ..."
-Total: 351 - FULL: 131
-```
-**Result:** Firestore connection successful
-**Note:** Firebase env vars were already present, just needed to re-source .env.local
-
-### Test 3: Docs Structure ✅ PASS
-```bash
-$ ls docs/engineering/ docs/product/ docs/playbook/
-```
-**Result:** All folders present with expected files:
-- engineering/ (7 files): API_REFERENCE, DATA_MODEL, DEALER_NAMES, EXCEL_SYNC_REFERENCE, MIGRATION_HISTORY, PYTHON_SCRIPTS, TYPESCRIPT_MODULES
-- product/ (5 files): ADMIN_DASHBOARD, DEALER_LIFECYCLE, EMAIL_AUTOMATION, RENDER_PIPELINE, SPREADSHEET_SYSTEM
-- playbook/ (5 files): COMPLIANCE_GUIDE, COMPLIANCE_WOODHOUSE, DEVELOPMENT_WORKFLOW, QUICK_COMMANDS, TROUBLESHOOTING
-
-### Test 4: Dev Server ⏭️ NOT TESTED YET
-**Status:** Firestore now working, dev server should start successfully
-**Run:** `npm run dev` when ready to test
-
----
-
-## Quick Checklist
-- [x] `echo $WINDOWS_USERNAME` shows `gregw`
-- [x] Firestore query returns 351 dealers (131 FULL)
-- [ ] Dev server starts (not tested yet, but should work)
-- [x] Docs folders exist with files
-
----
-
-## Summary
-
-**Overall Status:** ✅ PASS - Laptop fully synced and ready for development
-
-**What Works:**
-- ✅ Machine-specific WINDOWS_USERNAME configuration (gregw)
-- ✅ Documentation reorganization (all folders and files present)
-- ✅ Python scripts configured for laptop paths
-- ✅ Firebase environment variables present and working
-- ✅ Firestore queries working (351 dealers, 131 FULL)
-
-**What Doesn't Work (Expected):**
-- ⚠️ Excel sync requires pandas + OneDrive mount (use desktop for this)
-
-**Ready For:**
-- Local development (`npm run dev`)
-- Firestore queries
-- Admin dashboard testing
-- All TypeScript/Next.js development
-
-**Note:** Firebase env vars were already in .env.local, initial test failed because env wasn't sourced. Re-test passed.
+### Excel sync returns empty or wrong data
+Check that `SHAREPOINT_FILE_PATH` is correct and the Excel file hasn't been moved.
 
 ---
 
 ## After Testing
 
-Delete this file or leave it - it's in docs/temp/ which can be cleaned up later.
+This file can be deleted once laptop sync is verified. Or keep it for reference.

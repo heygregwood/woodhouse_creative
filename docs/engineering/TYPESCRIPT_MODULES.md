@@ -23,7 +23,8 @@ Core TypeScript modules that power the API and automation features.
 | [creatomate.ts](#creatomatets) | Video rendering API | ~210 |
 | [renderQueue.ts](#renderqueuets) | Render job management | ~300 |
 | [blocked-dealers.ts](#blocked-dealersts) | Email blocklist | ~40 |
-| [sync-excel.ts](#sync-excelts) | Excel sync (local only) | ~500 |
+| [microsoft-auth.ts](#microsoft-authts) | Microsoft Graph OAuth2 | ~270 |
+| [sync-excel.ts](#sync-excelts) | Excel sync from SharePoint | ~530 |
 
 ---
 
@@ -251,31 +252,100 @@ export function isDealerBlocked(dealerNo: string): boolean {
 
 ---
 
-## sync-excel.ts
+## microsoft-auth.ts
 
-**Purpose:** Excel sync from Allied Air spreadsheet (LOCAL ONLY).
-
-**Status:** Does not work on Vercel - requires Python + WSL OneDrive access.
+**Purpose:** Microsoft Graph API OAuth2 authentication using device code flow.
 
 **Key Functions:**
 
 | Function | Purpose |
 |----------|---------|
-| `syncFromExcel()` | Preview changes from Excel |
-| `applyChanges()` | Apply changes to Firestore |
+| `getAuthenticatedGraphClient()` | Get authenticated Graph API client |
+| `hasValidToken()` | Check if cached token exists |
+| `clearTokenCache()` | Clear cached tokens (logout) |
+| `getCachedAccountInfo()` | Get info about authenticated user |
 
-**Why Local Only:**
-- Excel file is on SharePoint OneDrive
-- Microsoft Graph API requires delegated auth (user context)
-- Python script reads via WSL mount: `/mnt/c/Users/GregWood/OneDrive...`
+**How It Works:**
+1. First call checks for cached token in `.microsoft-token-cache.json`
+2. If cached token exists, uses refresh token to get new access token silently
+3. If no cached token, prompts user with device code to authenticate
+4. User visits `microsoft.com/devicelogin` and enters code
+5. After auth, tokens are cached for up to 90 days
 
-**Machine-Specific Config:**
+**Token Lifetimes:**
+- Access token: ~1 hour (auto-refreshed)
+- Refresh token: Up to 90 days of inactivity
+- Re-authentication only needed every 90 days
+
+**Token Cache File:**
+- Location: `.microsoft-token-cache.json` (project root)
+- Committed to repo for multi-machine sync (desktop + laptop)
+- Contains MSAL token cache with refresh tokens
+
+**CLI Test/Management:**
 ```bash
-# Desktop
-WINDOWS_USERNAME=GregWood
+# Test authentication
+npx tsx scripts/test-microsoft-auth.ts
 
-# Laptop
-WINDOWS_USERNAME=gregw
+# Check token status
+npx tsx scripts/test-microsoft-auth.ts --status
+
+# Force re-authentication
+npx tsx scripts/test-microsoft-auth.ts --clear
+```
+
+**Environment Variables:**
+- `MICROSOFT_TENANT_ID` - Azure AD tenant ID
+- `MICROSOFT_CLIENT_ID` - App registration client ID
+
+**Azure App Registration:**
+- Name: "Woodhouse Creative Automation"
+- Permissions: Files.ReadWrite.All (Delegated), User.Read (Delegated)
+- Public client flows: Enabled
+
+---
+
+## sync-excel.ts
+
+**Purpose:** Sync dealers from Allied Air Excel file on SharePoint to Firestore.
+
+**Status:** Works on both localhost and Vercel (uses Microsoft Graph API with OAuth2).
+
+**Key Functions:**
+
+| Function | Purpose |
+|----------|---------|
+| `syncFromExcel(apply)` | Sync dealers (dry-run or apply) |
+| `readExcelData()` | Read Excel file via Graph API |
+| `compareDealers()` | Find new/removed/updated dealers |
+| `applyChanges()` | Write changes to Firestore |
+| `isAuthenticated()` | Check if Graph API auth is valid |
+
+**Data Flow:**
+```
+SharePoint Excel → Microsoft Graph API → TypeScript Parser → Firestore
+```
+
+**Authentication:**
+- Uses `microsoft-auth.ts` for OAuth2 device code flow
+- Token cached in `.microsoft-token-cache.json` (valid ~90 days)
+- First run on new machine requires device code auth
+
+**Environment Variables:**
+- `MICROSOFT_TENANT_ID`
+- `MICROSOFT_CLIENT_ID`
+- `SHAREPOINT_OWNER_EMAIL` - Drive owner (greg@woodhouseagency.com)
+- `SHAREPOINT_FILE_PATH` - Path to Excel file on OneDrive
+
+**Usage:**
+```typescript
+import { syncFromExcel } from '@/lib/sync-excel';
+
+// Dry run (preview changes)
+const { changes } = await syncFromExcel(false);
+
+// Apply changes
+const { changes, applied } = await syncFromExcel(true);
 ```
 
 ---

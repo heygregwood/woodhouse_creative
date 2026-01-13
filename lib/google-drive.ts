@@ -389,15 +389,25 @@ export async function getFileShareableLink(fileId: string): Promise<string | nul
   try {
     const drive = getDriveClient();
 
-    // Set permissions to "anyone with link can view"
-    await drive.permissions.create({
-      fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-      supportsAllDrives: true,
-    });
+    // Try to set permissions to "anyone with link can view"
+    // This may fail on Shared Drives where permissions are inherited - that's OK
+    try {
+      await drive.permissions.create({
+        fileId,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone',
+        },
+        supportsAllDrives: true,
+      });
+    } catch (permError: unknown) {
+      // 403 means inherited permissions exist (Shared Drive) - file is already shared
+      const error = permError as { code?: number };
+      if (error.code !== 403) {
+        throw permError;
+      }
+      console.log('[google-drive] File inherits sharing from parent folder, skipping permission creation');
+    }
 
     // Get file metadata with webViewLink
     const response = await drive.files.get({
