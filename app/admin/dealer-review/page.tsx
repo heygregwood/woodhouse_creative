@@ -527,44 +527,49 @@ export default function DealerReviewPage() {
                   </div>
 
                   {/* Approve Result */}
-                  {approveResults[dealer.dealer_no] && (
-                    <div
-                      className={`p-4 rounded-lg ${
-                        approveResults[dealer.dealer_no].success
-                          ? 'bg-green-50 border border-green-400'
-                          : 'bg-red-50 border border-red-400'
-                      }`}
-                    >
-                      {approveResults[dealer.dealer_no].success && approveResults[dealer.dealer_no].spreadsheet ? (
-                        <>
-                          <p className="font-semibold text-green-800 mb-2">
-                            ✓ Approved! Automation Complete
-                          </p>
-                          <div className="text-sm text-green-700 space-y-1">
-                            <p>• Spreadsheet: Added (column {approveResults[dealer.dealer_no].spreadsheet?.column})</p>
-                            <p>• Post copy: {approveResults[dealer.dealer_no].postsPopulated} post(s) populated</p>
-                            <p>• Render batches: {approveResults[dealer.dealer_no].renderBatches?.length || 0} created</p>
-                            <p>• Emails: Sent to dealer and Olivia</p>
-                          </div>
-                          <p className="text-sm text-green-600 mt-2">
-                            Renders will complete in ~{approveResults[dealer.dealer_no].estimatedCompletion}
-                          </p>
-                          {approveResults[dealer.dealer_no].warnings?.length > 0 && (
-                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-300 rounded">
-                              <p className="text-xs font-medium text-yellow-800">⚠ Warnings:</p>
-                              <ul className="text-xs text-yellow-700 ml-4 list-disc">
-                                {approveResults[dealer.dealer_no].warnings?.map((w: string, i: number) => <li key={i}>{w}</li>)}
-                              </ul>
+                  {(() => {
+                    const result = approveResults[dealer.dealer_no];
+                    if (!result) return null;
+
+                    return (
+                      <div
+                        className={`p-4 rounded-lg ${
+                          result.success
+                            ? 'bg-green-50 border border-green-400'
+                            : 'bg-red-50 border border-red-400'
+                        }`}
+                      >
+                        {result.success && result.spreadsheet ? (
+                          <>
+                            <p className="font-semibold text-green-800 mb-2">
+                              ✓ Approved! Automation Complete
+                            </p>
+                            <div className="text-sm text-green-700 space-y-1">
+                              <p>• Spreadsheet: Added (column {result.spreadsheet?.column})</p>
+                              <p>• Post copy: {result.postsPopulated} post(s) populated</p>
+                              <p>• Render batches: {result.renderBatches?.length || 0} created</p>
+                              <p>• Emails: Sent to dealer and Olivia</p>
                             </div>
-                          )}
-                        </>
-                      ) : (
-                        <p className={approveResults[dealer.dealer_no].success ? 'text-green-800' : 'text-red-800'}>
-                          {approveResults[dealer.dealer_no].message}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                            <p className="text-sm text-green-600 mt-2">
+                              Renders will complete in ~{result.estimatedCompletion}
+                            </p>
+                            {result.warnings && result.warnings.length > 0 && (
+                              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-300 rounded">
+                                <p className="text-xs font-medium text-yellow-800">⚠ Warnings:</p>
+                                <ul className="text-xs text-yellow-700 ml-4 list-disc">
+                                  {result.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className={result.success ? 'text-green-800' : 'text-red-800'}>
+                            {result.message}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Approve Button */}
                   <div className="flex justify-end pt-2">
