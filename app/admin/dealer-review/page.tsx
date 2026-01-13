@@ -549,11 +549,11 @@ export default function DealerReviewPage() {
                           <p className="text-sm text-green-600 mt-2">
                             Renders will complete in ~{approveResults[dealer.dealer_no].estimatedCompletion}
                           </p>
-                          {approveResults[dealer.dealer_no].warnings && approveResults[dealer.dealer_no].warnings.length > 0 && (
+                          {approveResults[dealer.dealer_no].warnings?.length > 0 && (
                             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-300 rounded">
                               <p className="text-xs font-medium text-yellow-800">⚠ Warnings:</p>
                               <ul className="text-xs text-yellow-700 ml-4 list-disc">
-                                {approveResults[dealer.dealer_no].warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                                {approveResults[dealer.dealer_no].warnings?.map((w: string, i: number) => <li key={i}>{w}</li>)}
                               </ul>
                             </div>
                           )}
