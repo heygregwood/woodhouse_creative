@@ -3,7 +3,59 @@
 **Purpose:** Internal creative automation for Woodhouse Agency Allied Air dealers
 **Status:** Active - 124 FULL dealers ready for automation
 **Deployed:** https://woodhouse-creative.vercel.app
-**Last Updated:** January 12, 2026
+**Last Updated:** January 18, 2026
+
+---
+
+## Related Repo: woodhouse_social
+
+⚠️ **CRITICAL:** There are TWO separate repos. Understanding the split prevents legacy code confusion.
+
+**Repo:** `~/woodhouse_social`
+**Purpose:** SaaS product for paying HVAC contractors (separate from Allied Air)
+**Database:** Firestore (default database, same Firebase project)
+
+### Key Differences
+
+| Aspect | woodhouse_creative (this repo) | woodhouse_social |
+|--------|-------------------------------|------------------|
+| **Purpose** | Internal agency ops for Allied Air | SaaS product for customers |
+| **Database** | `woodhouse-creative-db` (named) | Default Firestore database |
+| **Users** | 351 Allied Air dealers | Paying SaaS customers |
+| **Content** | Custom Creatomate renders per dealer | Shared reel_library + AI selection |
+| **Scheduling** | Batch renders → Drive folders → Spreadsheet | AI scheduler → Late API |
+| **Location** | `~/woodhouse_creative` | `~/woodhouse_social` |
+
+### History & Context
+
+**January 2026:** Repos were split from a single codebase
+- **Before:** woodhouse_social contained Allied Air dealers + SaaS customers (shared database)
+- **After:** Allied Air moved to woodhouse_creative with separate database
+- **Why:** Different business models, different workflows, different data structures
+
+### When to Reference woodhouse_social
+
+**Use woodhouse_social context when:**
+- Investigating SaaS features (Stripe, subscriptions, customer onboarding)
+- Understanding reel_library (shared content pool used by SaaS)
+- AI scheduling agents (may have patterns useful here)
+- Comparing customer-facing features
+
+**Stay in woodhouse_creative when:**
+- Allied Air dealer operations (this is our primary focus)
+- Excel sync from Allied Air database
+- Custom Creatomate rendering workflows
+- Spreadsheet/Drive automation for dealers
+
+### What to Watch For
+
+If you see references to:
+- "Customer" terminology (SaaS) vs "Dealer" (Allied Air)
+- `reel_library` collection (that's SaaS, not Allied)
+- Subscription/payment logic (that's SaaS)
+- AI scheduling agents (might be adaptable from SaaS)
+
+You may be looking at code patterns from woodhouse_social that could inform decisions here.
 
 ---
 
