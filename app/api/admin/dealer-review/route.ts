@@ -8,9 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDealers, approveDealer, type FirestoreDealer } from '@/lib/firestore-dealers';
+import { getDealers, approveDealer, getDealer, type FirestoreDealer } from '@/lib/firestore-dealers';
 import { addDealerToSpreadsheet, getActivePostsFromSpreadsheet, populatePostCopyForDealer } from '@/lib/google-sheets';
 import { sendFbAdminAcceptedEmail, sendOnboardingCompleteEmail } from '@/lib/email';
+import { createRenderBatch, createRenderJob } from '@/lib/renderQueue';
 
 interface DealerReview {
   dealer_no: string;
@@ -127,38 +128,40 @@ export async function POST(request: NextRequest) {
     const successfulPopulates = populateResults.filter(r => r.success).length;
     console.log(`[dealer-review] Populated ${successfulPopulates}/${activePosts.length} posts`);
 
-    // 5. Create render jobs for this ONE dealer (using dealerNo filter)
+    // 5. Create render jobs for this ONE dealer (direct function call, no fetch)
     const renderResults = [];
+
+    // Get dealer info for render job
+    const dealer = await getDealer(dealer_no);
+    if (!dealer) {
+      throw new Error(`Dealer ${dealer_no} not found after approval`);
+    }
+
     for (const post of activePosts) {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/creative/render-batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            postNumber: post.postNumber,
-            templateId: post.templateId,
-            dealerNo: dealer_no  // Filter to this one dealer
-          })
+        // Create batch for this post
+        const batchId = await createRenderBatch({
+          postNumber: post.postNumber,
+          templateId: post.templateId,
+          totalJobs: 1,  // Just this one dealer
+          createdBy: 'dealer-review',
         });
 
-        const data = await response.json();
+        // Create render job for this dealer
+        await createRenderJob({
+          batchId,
+          businessId: dealer_no,
+          businessName: display_name,
+          postNumber: post.postNumber,
+          templateId: post.templateId,
+        });
 
-        if (response.ok && data.status === 'success') {
-          const batchId = data.batches?.[0]?.batchId || '';
-          renderResults.push({
-            postNumber: post.postNumber,
-            success: true,
-            batchId,
-            message: 'Batch created'
-          });
-        } else {
-          renderResults.push({
-            postNumber: post.postNumber,
-            success: false,
-            batchId: '',
-            message: data.error || data.message || 'Failed to create batch'
-          });
-        }
+        renderResults.push({
+          postNumber: post.postNumber,
+          success: true,
+          batchId,
+          message: 'Batch created'
+        });
       } catch (error) {
         console.error(`[dealer-review] Failed to create render batch for post ${post.postNumber}:`, error);
         renderResults.push({
