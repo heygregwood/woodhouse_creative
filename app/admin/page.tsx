@@ -78,7 +78,21 @@ export default function CreativeAdminPage() {
     message?: string;
   } | null>(null);
 
-  // Insert variable at cursor position
+  // Create New Post State
+  const [newPostNumber, setNewPostNumber] = useState('');
+  const [newPostTemplateId, setNewPostTemplateId] = useState('');
+  const [newPostBaseCopy, setNewPostBaseCopy] = useState('');
+  const [creatingPost, setCreatingPost] = useState(false);
+  const [createPostResult, setCreatePostResult] = useState<{
+    success?: boolean;
+    error?: string;
+    postNumber?: number;
+    spreadsheet?: { row: number; dealersPopulated: number };
+    render?: { batchId: string; jobsCreated: number; estimatedMinutes: number };
+    message?: string;
+  } | null>(null);
+
+  // Insert variable at cursor position for populate post copy
   const insertVariable = (variable: string) => {
     const textarea = document.getElementById('baseCopyTextarea') as HTMLTextAreaElement;
     if (textarea) {
@@ -93,6 +107,68 @@ export default function CreativeAdminPage() {
       }, 0);
     } else {
       setPopulateBaseCopy(populateBaseCopy + variable);
+    }
+  };
+
+  // Insert variable at cursor position for new post form
+  const insertNewPostVariable = (variable: string) => {
+    const textarea = document.getElementById('newPostBaseCopyTextarea') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = newPostBaseCopy.substring(0, start) + variable + newPostBaseCopy.substring(end);
+      setNewPostBaseCopy(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    } else {
+      setNewPostBaseCopy(newPostBaseCopy + variable);
+    }
+  };
+
+  // Handle create new post
+  const handleCreatePost = async () => {
+    if (!newPostNumber || !newPostTemplateId || !newPostBaseCopy) {
+      setCreatePostResult({ error: 'Post number, template ID, and base copy are required' });
+      return;
+    }
+
+    try {
+      setCreatingPost(true);
+      setCreatePostResult(null);
+
+      const response = await fetch('/api/admin/create-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postNumber: newPostNumber,
+          templateId: newPostTemplateId,
+          baseCopy: newPostBaseCopy,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setCreatePostResult({
+          success: true,
+          postNumber: data.postNumber,
+          spreadsheet: data.spreadsheet,
+          render: data.render,
+          message: data.message,
+        });
+        // Clear the form
+        setNewPostNumber('');
+        setNewPostTemplateId('');
+        setNewPostBaseCopy('');
+      } else {
+        setCreatePostResult({ error: data.error || 'Failed to create post' });
+      }
+    } catch (error) {
+      setCreatePostResult({ error: error instanceof Error ? error.message : 'Failed to create post' });
+    } finally {
+      setCreatingPost(false);
     }
   };
 
@@ -750,6 +826,140 @@ export default function CreativeAdminPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Create New Post Section */}
+        <div className="mt-6">
+          <div className="bg-white border-2 border-emerald-500 rounded-lg shadow-lg overflow-hidden">
+            <div className="bg-emerald-500 px-6 py-4 border-b-2 border-emerald-600">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Create New Post</h2>
+                  <p className="text-sm text-white/90 mt-1">
+                    Add post to Firestore, populate spreadsheet, and create render jobs - all in one step
+                  </p>
+                </div>
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                >
+                  Open Spreadsheet
+                </a>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Post Number and Template ID */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Post Number
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    value={newPostNumber}
+                    onChange={(e) => setNewPostNumber(e.target.value)}
+                    placeholder="673"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Creatomate Template ID
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg font-mono text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    value={newPostTemplateId}
+                    onChange={(e) => setNewPostTemplateId(e.target.value)}
+                    placeholder="abc123-def456-..."
+                  />
+                </div>
+              </div>
+
+              {/* Base Copy Textarea */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Base Post Copy
+                  </label>
+                  <div className="flex gap-1">
+                    <span className="text-xs text-gray-500 mr-2">Insert:</span>
+                    <button
+                      type="button"
+                      onClick={() => insertNewPostVariable('{name}')}
+                      className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium"
+                    >
+                      Name
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertNewPostVariable('{phone}')}
+                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                    >
+                      Phone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertNewPostVariable('{website}')}
+                      className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors font-medium"
+                    >
+                      Website
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  id="newPostBaseCopyTextarea"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                  rows={4}
+                  value={newPostBaseCopy}
+                  onChange={(e) => setNewPostBaseCopy(e.target.value)}
+                  placeholder="Enter post copy here. Use the buttons above to insert variables like {name}, {phone}, or {website}."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Variables: <code className="bg-purple-100 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-blue-100 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-green-100 px-1 rounded">{'{website}'}</code> = Website
+                </p>
+              </div>
+
+              {/* Create Button */}
+              <button
+                onClick={handleCreatePost}
+                disabled={creatingPost || !newPostNumber || !newPostTemplateId || !newPostBaseCopy}
+                className="w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
+              >
+                {creatingPost ? 'Creating Post...' : 'Create Post & Start Renders'}
+              </button>
+
+              {/* Result */}
+              {createPostResult && (
+                <div
+                  className={`p-4 rounded-lg ${
+                    createPostResult.error
+                      ? 'bg-red-50 border border-red-500 text-red-800'
+                      : 'bg-green-50 border border-green-500 text-green-800'
+                  }`}
+                >
+                  {createPostResult.error ? (
+                    <>
+                      <p className="font-medium">Error</p>
+                      <p className="text-sm mt-1">{createPostResult.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-green-800 mb-2">Post {createPostResult.postNumber} Created Successfully!</p>
+                      <div className="text-sm space-y-1">
+                        <p>• Spreadsheet: Row {createPostResult.spreadsheet?.row}, {createPostResult.spreadsheet?.dealersPopulated} dealers populated</p>
+                        <p>• Renders: {createPostResult.render?.jobsCreated} jobs queued (Batch: {createPostResult.render?.batchId?.slice(0, 8)}...)</p>
+                        <p className="text-green-600 mt-2">Estimated completion: ~{createPostResult.render?.estimatedMinutes} minutes</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
