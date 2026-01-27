@@ -489,7 +489,15 @@ Session hooks are configured to help with context continuity across Claude Code 
 
 **CRITICAL:** Session saves are MANUAL. Hooks cannot access conversation content, so Claude must run the save command directly.
 
-**Command:**
+**⚠️ DO NOT prefix with `set -a && source .env.local` — the script loads `.env.local` via dotenv internally. Adding shell source commands breaks the stdin pipe.**
+
+**Command (Option A — file argument, most reliable):**
+```bash
+node scripts/write-session-context.js /tmp/claude-session-context.json
+```
+Write the JSON to the file first using the Write tool, then run the command above.
+
+**Command (Option B — pipe):**
 ```bash
 echo '{"summary": "...", "topics": [...], "trigger": "task_complete", ...}' | node scripts/write-session-context.js
 ```

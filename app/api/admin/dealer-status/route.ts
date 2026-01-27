@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getDealers, promoteToFull, demoteToContent, type FirestoreDealer } from '@/lib/firestore-dealers';
+import { getFolderIdByPath } from '@/lib/google-drive';
 const SPREADSHEET_ID = '1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY';
 const DEALERS_FOLDER_ID = '1QwyyE9Pq-p8u-TEz7B5nC-14BERpDPmv';
 const COL_DEALERS_START = 6;
@@ -181,34 +182,11 @@ async function removeFromSpreadsheet(dealerNo: string, auth: ReturnType<typeof g
   return true;
 }
 
-async function createDriveFolder(dealerName: string, auth: ReturnType<typeof getGoogleAuth>) {
-  const drive = google.drive({ version: 'v3', auth });
-
-  // Check if folder exists
-  const escapedName = dealerName.replace(/'/g, "\\'");
-  const response = await drive.files.list({
-    q: `name='${escapedName}' and '${DEALERS_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id, name)',
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-  });
-
-  if (response.data.files?.length) {
-    return response.data.files[0].id;
-  }
-
-  // Create new folder
-  const folder = await drive.files.create({
-    requestBody: {
-      name: dealerName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [DEALERS_FOLDER_ID],
-    },
-    fields: 'id',
-    supportsAllDrives: true,
-  });
-
-  return folder.data.id;
+async function createDriveFolder(dealerName: string, _auth: ReturnType<typeof getGoogleAuth>) {
+  // Use shared folder creation from lib/google-drive.ts which has
+  // race condition protection (in-process lock + post-creation verification)
+  const sanitizedName = dealerName.replace(/[/\\?%*:|"<>]/g, '-');
+  return getFolderIdByPath(`Dealers/${sanitizedName}`);
 }
 
 export async function POST(request: NextRequest) {

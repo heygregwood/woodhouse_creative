@@ -6,6 +6,75 @@ All notable changes to Woodhouse Creative are documented here.
 
 ---
 
+## [2026-01-27] - Add Manage Existing Dealers to Dealer Review Page
+
+### Added
+- **Manage Existing Dealers section** on `/admin/dealer-review`
+  - Search by dealer name or number (client-side, instant)
+  - Shows 10 most recently modified FULL dealers by default
+  - "Show All" expands to full alphabetical list
+  - Lazy-loads on first interaction (doesn't slow down pending review)
+  - Inline editing of display name, phone, website, and logo
+  - "Save Changes" button updates Firestore only (no re-renders triggered)
+  - Compact collapsed card view for quick scanning, expand to edit
+
+- **PATCH `/api/admin/dealer-review`** — field-only update endpoint
+  - Updates display_name, creatomate_phone, creatomate_website, creatomate_logo
+  - No automation pipeline (no spreadsheet sync, renders, or emails)
+
+- **GET `/api/admin/dealer-review?section=existing`** — fetch approved FULL dealers
+  - Returns all FULL dealers with `ready_for_automate: 'yes'`, sorted by `updated_at` desc
+
+### Changed
+- **Refactored dealer-review page** from 700-line monolith into modular components:
+  - `page.tsx` (~230 lines) — orchestrator with shared state
+  - `components/DealerCard.tsx` (~270 lines) — reusable editable form card
+  - `components/LogoFinderOverlay.tsx` (~170 lines) — shared logo finder modal
+  - `components/ManageExistingDealers.tsx` (~270 lines) — section 2 container
+- Logo finder overlay now shared between pending review and manage sections
+  via `source` field in overlay state
+
+### Files Changed
+- `app/api/admin/dealer-review/route.ts` — added PATCH handler, modified GET
+- `app/admin/dealer-review/page.tsx` — refactored as orchestrator
+- `app/admin/dealer-review/components/DealerCard.tsx` — new
+- `app/admin/dealer-review/components/LogoFinderOverlay.tsx` — new
+- `app/admin/dealer-review/components/ManageExistingDealers.tsx` — new
+
+---
+
+## [2026-01-27] - Fix Google Drive Duplicate Folder Race Condition
+
+### Fixed
+- **Race condition in `ensureFolderPath()`** (`lib/google-drive.ts:117-230`)
+  - When multiple Creatomate webhooks arrive simultaneously for the same dealer,
+    concurrent calls to `ensureFolderPath()` could create duplicate folders with
+    identical names in Google Drive
+  - **Root cause:** TOCTOU (time-of-check-to-time-of-use) — two concurrent calls
+    both check "does folder exist?", both get "no", both create it
+  - **Fix — Layer 1:** In-process promise lock (`folderCreationLocks` Map) — concurrent
+    calls for the same path within the same serverless instance share one promise
+  - **Fix — Layer 2:** Post-creation verification — after creating a folder, re-queries
+    Google Drive; if duplicates exist, keeps the oldest and deletes the rest
+  - **Impact:** Prevents duplicate dealer folders for all future batch renders
+
+### Changed
+- **`createDriveFolder()` in `app/api/admin/dealer-status/route.ts`** now delegates
+  to the shared `getFolderIdByPath()` from `lib/google-drive.ts` instead of using its
+  own folder creation logic, ensuring all folder creation goes through the
+  race-protected code path
+
+### Investigated
+- **Comfort Specialist Heating & Air (10453075):** Two folders created Jan 19 — one
+  with 16 videos, one empty. Empty folder already deleted.
+- **Reliable Climate Control LLC (10529007):** Two folders created Jan 26 — same
+  pattern. Empty folder already deleted.
+- **Welling Service Company (10130):** Folder "10130 - Welling Service Company" (empty,
+  different naming convention) + "Welling Service Company" (16 videos). All reels present.
+  Olivia notified via email with direct folder link.
+
+---
+
 ## [2026-01-13] - Documentation Reorganization & Cleanup
 
 ### Added

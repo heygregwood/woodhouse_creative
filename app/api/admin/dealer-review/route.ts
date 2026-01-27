@@ -1,40 +1,43 @@
 /**
- * GET /api/admin/dealer-review - List dealers pending review
- * POST /api/admin/dealer-review - Approve a dealer after review
- *
- * Dealers promoted from CONTENT to FULL need manual review before:
- * - Adding to scheduling spreadsheet
- * - Sending FB Admin Accepted email
+ * GET /api/admin/dealer-review - List dealers pending review or existing approved dealers
+ * POST /api/admin/dealer-review - Approve a dealer after review (full automation)
+ * PATCH /api/admin/dealer-review - Update dealer fields only (no automation)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDealers, approveDealer, getDealer, type FirestoreDealer } from '@/lib/firestore-dealers';
+import { getDealers, approveDealer, getDealer, updateDealer } from '@/lib/firestore-dealers';
 import { addDealerToSpreadsheet, getActivePostsFromSpreadsheet, populatePostCopyForDealer } from '@/lib/google-sheets';
 import { sendFbAdminAcceptedEmail, sendOnboardingCompleteEmail } from '@/lib/email';
 import { createRenderBatch, createRenderJob } from '@/lib/renderQueue';
 
-interface DealerReview {
-  dealer_no: string;
-  dealer_name: string;
-  display_name: string | null;
-  distributor_name: string | null;
-  contact_name: string | null;
-  contact_first_name: string | null;
-  contact_email: string | null;
-  turnkey_phone: string | null;
-  dealer_web_address: string | null;
-  creatomate_phone: string | null;
-  creatomate_website: string | null;
-  creatomate_logo: string | null;
-  region: string | null;
-  program_status: string;
-  review_status: string;
-  updated_at: string;
-}
-
-// GET - List dealers pending review
-export async function GET() {
+// GET - List dealers by section
+// ?section=pending (default) - dealers with review_status='pending_review'
+// ?section=existing - all FULL dealers with ready_for_automate='yes'
+export async function GET(request: NextRequest) {
   try {
+    const section = request.nextUrl.searchParams.get('section') || 'pending';
+
+    if (section === 'existing') {
+      const dealers = await getDealers({
+        program_status: 'FULL',
+        ready_for_automate: 'yes',
+      });
+
+      // Sort by updated_at descending (most recently modified first)
+      dealers.sort((a, b) => {
+        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: dealers.length,
+        dealers,
+      });
+    }
+
+    // Default: pending review
     const dealers = await getDealers({ review_status: 'pending_review' });
 
     return NextResponse.json({
@@ -45,6 +48,64 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to fetch dealers' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH - Update dealer fields only (no automation pipeline)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { dealer_no, display_name, creatomate_phone, creatomate_website, creatomate_logo } = body;
+
+    if (!dealer_no) {
+      return NextResponse.json(
+        { success: false, error: 'dealer_no is required' },
+        { status: 400 }
+      );
+    }
+
+    // Build partial update from provided fields only
+    const updates: Record<string, string> = {};
+    const updatedFields: string[] = [];
+
+    if (display_name !== undefined) {
+      updates.display_name = display_name;
+      updatedFields.push('display_name');
+    }
+    if (creatomate_phone !== undefined) {
+      updates.creatomate_phone = creatomate_phone;
+      updatedFields.push('creatomate_phone');
+    }
+    if (creatomate_website !== undefined) {
+      updates.creatomate_website = creatomate_website;
+      updatedFields.push('creatomate_website');
+    }
+    if (creatomate_logo !== undefined) {
+      updates.creatomate_logo = creatomate_logo;
+      updatedFields.push('creatomate_logo');
+    }
+
+    if (updatedFields.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    await updateDealer(dealer_no, updates);
+    console.log(`[dealer-review] Updated fields for ${dealer_no}: ${updatedFields.join(', ')}`);
+
+    return NextResponse.json({
+      success: true,
+      dealer_no,
+      updated_fields: updatedFields,
+    });
+  } catch (error: unknown) {
+    console.error('[dealer-review] Error updating dealer:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to update dealer' },
       { status: 500 }
     );
   }

@@ -199,6 +199,16 @@ wsl -d Ubuntu
 
 ---
 
+## External Service Logins
+
+| Service | Login | URL |
+|---------|-------|-----|
+| Resend (woodhouse_creative) | Google login: `communitymanagers@woodhousesocial.com` | [resend.com](https://resend.com) |
+
+**Note:** The Resend account uses the `woodhouseagency.com` sending domain, but login is via Google with the `communitymanagers@woodhousesocial.com` account.
+
+---
+
 ## Related Documentation
 
 | File | Purpose |

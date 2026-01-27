@@ -114,13 +114,42 @@ export async function uploadToGoogleDrive({
   }
 }
 
+// In-process lock to prevent duplicate folder creation when multiple
+// concurrent webhook handlers try to create the same folder path.
+// Key: full folder path, Value: in-flight promise resolving to folder ID.
+const folderCreationLocks = new Map<string, Promise<string>>();
+
 /**
- * Ensure folder path exists in Google Drive, creating folders as needed
+ * Ensure folder path exists in Google Drive, creating folders as needed.
+ *
+ * Uses two layers of race condition protection:
+ * 1. In-process promise lock — concurrent calls for the same path within
+ *    the same serverless instance share a single creation promise.
+ * 2. Post-creation verification — after creating a folder, re-queries
+ *    Google Drive to detect cross-instance duplicates and cleans them up.
  *
  * @param path - Folder path like "Dealers/ABC Heating/2025-11"
  * @returns Final folder ID
  */
 async function ensureFolderPath(path: string): Promise<string> {
+  // If another call is already creating this exact path, wait for it
+  const existingLock = folderCreationLocks.get(path);
+  if (existingLock) {
+    console.log(`[google-drive] Waiting for in-flight folder creation: ${path}`);
+    return existingLock;
+  }
+
+  const promise = ensureFolderPathImpl(path);
+  folderCreationLocks.set(path, promise);
+
+  try {
+    return await promise;
+  } finally {
+    folderCreationLocks.delete(path);
+  }
+}
+
+async function ensureFolderPathImpl(path: string): Promise<string> {
   const drive = getDriveClient();
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
@@ -167,7 +196,39 @@ async function ensureFolderPath(path: string): Promise<string> {
         throw new Error(`Failed to create folder: ${part}`);
       }
 
-      currentFolderId = newFolder.data.id;
+      // Verify no duplicate was created by a concurrent serverless instance.
+      // Re-query immediately after creation to detect cross-instance races.
+      const verifyFolders = await drive.files.list({
+        q: query,
+        fields: 'files(id, name, createdTime)',
+        spaces: 'drive',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        orderBy: 'createdTime',
+      });
+
+      if (verifyFolders.data.files && verifyFolders.data.files.length > 1) {
+        // Race condition detected — multiple folders with the same name.
+        // Use the oldest (first-created) folder and delete ours if it's the duplicate.
+        const oldestFolder = verifyFolders.data.files[0];
+        console.log(`[google-drive] Duplicate folder detected for "${part}", using oldest: ${oldestFolder.id}`);
+
+        if (oldestFolder.id !== newFolder.data.id) {
+          try {
+            await drive.files.delete({
+              fileId: newFolder.data.id,
+              supportsAllDrives: true,
+            });
+            console.log(`[google-drive] Cleaned up duplicate folder: ${newFolder.data.id}`);
+          } catch (deleteError) {
+            console.error(`[google-drive] Failed to clean up duplicate folder: ${newFolder.data.id}`, deleteError);
+          }
+        }
+
+        currentFolderId = oldestFolder.id!;
+      } else {
+        currentFolderId = newFolder.data.id;
+      }
     }
   }
 
