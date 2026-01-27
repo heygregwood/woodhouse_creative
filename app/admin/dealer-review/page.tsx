@@ -315,28 +315,11 @@ export default function DealerReviewPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Woodhouse Creative Admin</h1>
-          </div>
-          <div className="flex gap-3">
-            <a href="/admin" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dashboard</a>
-            <a href="/admin/posts" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Posts</a>
-            <a href="/admin/scheduling" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Scheduling</a>
-            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Content Dealers</a>
-            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Dealer Review</a>
-            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
-          </div>
-        </div>
-      </div>
-
+    <>
       <div className="max-w-6xl mx-auto p-8">
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5378a8] mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading dealers...</p>
           </div>
         ) : error ? (
@@ -345,7 +328,7 @@ export default function DealerReviewPage() {
             <p className="text-sm mt-1">{error}</p>
           </div>
         ) : dealers.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border-2 border-green-400">
+          <div className="text-center py-12 bg-white rounded-lg border border-green-400">
             <div className="text-6xl mb-4">&#10003;</div>
             <h2 className="text-2xl font-bold text-green-800">All Caught Up!</h2>
             <p className="text-gray-600 mt-2">No dealers pending review.</p>
@@ -367,14 +350,14 @@ export default function DealerReviewPage() {
             {dealers.map((dealer) => (
               <div
                 key={dealer.dealer_no}
-                className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden"
+                className="bg-white border border-border rounded-lg shadow-sm overflow-hidden"
               >
                 {/* Dealer Header */}
-                <div className="bg-[#74a9de] px-6 py-4 border-b-2 border-[#5378a8]">
+                <div className="px-6 py-4 border-b border-border">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-lg font-bold text-black">{dealer.dealer_name}</h3>
-                      <p className="text-sm text-black/70">
+                      <h3 className="text-lg font-semibold text-text">{dealer.dealer_name}</h3>
+                      <p className="text-sm text-gray-500">
                         #{dealer.dealer_no} | {dealer.distributor_name}
                       </p>
                     </div>
@@ -396,7 +379,7 @@ export default function DealerReviewPage() {
                         type="text"
                         value={dealer.edited_display_name}
                         onChange={(e) => updateField(dealer.dealer_no, 'edited_display_name', e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5378a8] focus:border-transparent"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
                         placeholder="Ron's Heating and Cooling"
                       />
                       <span className="text-xs text-gray-500 self-center whitespace-nowrap">
@@ -415,7 +398,7 @@ export default function DealerReviewPage() {
                         type="text"
                         value={dealer.edited_phone}
                         onChange={(e) => updateField(dealer.dealer_no, 'edited_phone', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5378a8] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
                         placeholder="555-555-5555"
                       />
                       {dealer.turnkey_phone && dealer.edited_phone !== formatPhone(dealer.turnkey_phone) && (
@@ -430,7 +413,7 @@ export default function DealerReviewPage() {
                         type="text"
                         value={dealer.edited_website}
                         onChange={(e) => updateField(dealer.dealer_no, 'edited_website', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5378a8] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
                         placeholder="example.com"
                       />
                       {dealer.dealer_web_address && dealer.edited_website !== formatWebsite(dealer.dealer_web_address) && (
@@ -459,12 +442,12 @@ export default function DealerReviewPage() {
                         type="text"
                         value={dealer.edited_logo}
                         onChange={(e) => updateField(dealer.dealer_no, 'edited_logo', e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5378a8] focus:border-transparent"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
                         placeholder="https://drive.google.com/file/d/..."
                       />
                       <button
                         onClick={() => openLogoFinder(dealer)}
-                        className="px-4 py-2 bg-[#c87a3e] text-white rounded-lg hover:bg-[#b06930] transition-colors font-medium whitespace-nowrap"
+                        className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-dark transition-colors font-medium whitespace-nowrap"
                       >
                         Find Logo
                       </button>
@@ -492,7 +475,7 @@ export default function DealerReviewPage() {
                     <select
                       value={dealer.edited_region}
                       onChange={(e) => updateField(dealer.dealer_no, 'edited_region', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5378a8] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
                     >
                       <option value="">Select region...</option>
                       <option value="North">North</option>
@@ -581,7 +564,7 @@ export default function DealerReviewPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Overlay Header */}
-            <div className="bg-[#5378a8] text-white px-6 py-4 flex justify-between items-center">
+            <div className="bg-brand text-white px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold">Find Logo</h3>
                 <p className="text-white/80 text-sm">{logoOverlay.dealerName}</p>
@@ -598,7 +581,7 @@ export default function DealerReviewPage() {
             <div className="p-6 overflow-y-auto flex-1">
               {logoOverlay.loading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5378a8] mx-auto"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
                   <p className="mt-4 text-gray-600">Searching {logoOverlay.website} for logos...</p>
                 </div>
               ) : logoOverlay.error ? (
@@ -611,14 +594,14 @@ export default function DealerReviewPage() {
                     href={LOGOS_FOLDER_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block px-4 py-2 bg-[#5378a8] text-white rounded-lg hover:bg-[#4a6890] transition-colors"
+                    className="inline-block px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-dark transition-colors"
                   >
                     Open Logos Folder
                   </a>
                 </div>
               ) : logoOverlay.saving ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5378a8] mx-auto"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
                   <p className="mt-4 text-gray-600">Saving logo to staging folder...</p>
                 </div>
               ) : logoOverlay.savedToStaging ? (
@@ -656,7 +639,7 @@ export default function DealerReviewPage() {
                       <button
                         key={idx}
                         onClick={() => downloadLogoToStaging(logo)}
-                        className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#5378a8] hover:bg-blue-50 transition-colors group"
+                        className="border border-gray-200 rounded-lg p-4 hover:border-brand hover:bg-brand/5 transition-colors group"
                       >
                         <div className="aspect-video bg-gray-100 rounded flex items-center justify-center mb-2 overflow-hidden">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -681,7 +664,7 @@ export default function DealerReviewPage() {
                         <p className="text-xs text-gray-400">
                           {logo.width}x{logo.height} {logo.format}
                         </p>
-                        <p className="text-xs text-[#5378a8] font-medium mt-1 opacity-0 group-hover:opacity-100">
+                        <p className="text-xs text-brand font-medium mt-1 opacity-0 group-hover:opacity-100">
                           Click to download
                         </p>
                       </button>
@@ -711,6 +694,6 @@ export default function DealerReviewPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand: #12ace2;
+  --color-brand-dark: #1e78ab;
+  --color-text: #4a4d4b;
+  --color-border: #eeecec;
+  --color-surface: #ffffff;
+  --color-page: #f9fafb;
+
+  --font-sans: 'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

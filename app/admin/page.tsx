@@ -63,37 +63,19 @@ export default function CreativeAdminPage() {
   const autoApplied = syncResult?.autoApplied === true;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Woodhouse Creative Admin</h1>
-          </div>
-          <div className="flex gap-3">
-            <a href="/admin" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Dashboard</a>
-            <a href="/admin/posts" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Posts</a>
-            <a href="/admin/scheduling" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Scheduling</a>
-            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Content Dealers</a>
-            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dealer Review</a>
-            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-5xl mx-auto p-8">
         {/* Excel Sync Section */}
         <div className="mb-8">
-          <div className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-[#74a9de] px-6 py-4 border-b-2 border-[#5378a8]">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-black">Sync from Allied Excel</h2>
-                  <p className="text-sm text-black/70 mt-1">Check for new/changed dealers</p>
+                  <h2 className="text-lg font-semibold text-text">Sync from Allied Excel</h2>
+                  <p className="text-sm text-gray-500 mt-1">Check for new/changed dealers</p>
                 </div>
                 <a
                   href="ms-excel:ofe|u|https://woodhouseagency-my.sharepoint.com/:x:/p/greg/IQBRuqg2XiXNTIVnn6BLkArzAXUD3DR-8K3nxhQADxWtoP4?e=0MwJgK"
-                  className="text-xs px-2 py-1 bg-white/50 hover:bg-white/80 rounded text-black/70 hover:text-black transition-colors"
+                  className="text-xs px-2 py-1 text-brand hover:text-brand-dark transition-colors"
                 >
                   Open Excel
                 </a>
@@ -104,7 +86,7 @@ export default function CreativeAdminPage() {
               <button
                 onClick={handleCheckExcel}
                 disabled={syncing}
-                className="w-full px-6 py-3 bg-[#5378a8] text-white rounded-lg hover:bg-[#4a6890] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
+                className="w-full px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
               >
                 {syncing ? 'Syncing...' : 'Sync from Excel'}
               </button>
@@ -289,13 +271,13 @@ export default function CreativeAdminPage() {
             {/* Posts Card */}
             <a
               href="/admin/posts"
-              className="block p-6 bg-white border-2 border-emerald-400 rounded-lg shadow hover:shadow-lg hover:border-emerald-500 transition-all group"
+              className="block p-6 bg-white border border-border rounded-lg shadow-sm hover:shadow hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 text-xl">
+                <div className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand text-xl">
                   +
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-600">Posts</h3>
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand">Posts</h3>
               </div>
               <p className="text-sm text-gray-600">Create new posts, view existing posts, generate copy deck PDFs</p>
             </a>
@@ -303,13 +285,13 @@ export default function CreativeAdminPage() {
             {/* Scheduling Card */}
             <a
               href="/admin/scheduling"
-              className="block p-6 bg-white border-2 border-[#c87a3e] rounded-lg shadow hover:shadow-lg hover:border-orange-500 transition-all group"
+              className="block p-6 bg-white border border-border rounded-lg shadow-sm hover:shadow hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-[#c87a3e] text-xl">
+                <div className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand text-xl">
                   &#9654;
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#c87a3e]">Scheduling</h3>
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand">Scheduling</h3>
               </div>
               <p className="text-sm text-gray-600">FULL dealer operations: batch render, process emails, populate copy</p>
             </a>
@@ -317,13 +299,13 @@ export default function CreativeAdminPage() {
             {/* Content Dealers Card */}
             <a
               href="/admin/content-dealers"
-              className="block p-6 bg-white border-2 border-green-400 rounded-lg shadow hover:shadow-lg hover:border-green-500 transition-all group"
+              className="block p-6 bg-white border border-border rounded-lg shadow-sm hover:shadow hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-600 text-xl">
+                <div className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand text-xl">
                   &#9993;
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-green-600">Content Dealers</h3>
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand">Content Dealers</h3>
               </div>
               <p className="text-sm text-gray-600">CONTENT dealer operations: mail merge for welcome emails</p>
             </a>
@@ -331,13 +313,13 @@ export default function CreativeAdminPage() {
             {/* Dealer Review Card */}
             <a
               href="/admin/dealer-review"
-              className="block p-6 bg-white border-2 border-yellow-400 rounded-lg shadow hover:shadow-lg hover:border-yellow-500 transition-all group"
+              className="block p-6 bg-white border border-border rounded-lg shadow-sm hover:shadow hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600 text-xl">
+                <div className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand text-xl">
                   &#10003;
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-yellow-600">Dealer Review</h3>
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand">Dealer Review</h3>
               </div>
               <p className="text-sm text-gray-600">Review and approve dealers promoted to FULL status</p>
             </a>
@@ -345,13 +327,13 @@ export default function CreativeAdminPage() {
             {/* Email Templates Card */}
             <a
               href="/admin/email-templates"
-              className="block p-6 bg-white border-2 border-purple-400 rounded-lg shadow hover:shadow-lg hover:border-purple-500 transition-all group"
+              className="block p-6 bg-white border border-border rounded-lg shadow-sm hover:shadow hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 text-xl">
+                <div className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand text-xl">
                   &#9998;
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-600">Email Templates</h3>
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand">Email Templates</h3>
               </div>
               <p className="text-sm text-gray-600">View and edit email templates for dealer communications</p>
             </a>
@@ -360,12 +342,12 @@ export default function CreativeAdminPage() {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-            <p className="text-3xl font-bold text-[#5378a8]">124</p>
+          <div className="bg-white border border-border rounded-lg p-4 text-center">
+            <p className="text-3xl font-bold text-brand">124</p>
             <p className="text-sm text-gray-600">FULL Dealers</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-            <p className="text-3xl font-bold text-[#c87a3e]">656+</p>
+          <div className="bg-white border border-border rounded-lg p-4 text-center">
+            <p className="text-3xl font-bold text-brand">656+</p>
             <p className="text-sm text-gray-600">Posts in Archive</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
@@ -374,6 +356,5 @@ export default function CreativeAdminPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

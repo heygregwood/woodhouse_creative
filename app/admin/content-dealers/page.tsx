@@ -20,27 +20,9 @@ export default function ContentDealersPage() {
   const [mailMergeResult, setMailMergeResult] = useState<{ success: boolean; message: string } | null>(null);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Content Dealers</h1>
-          </div>
-          <div className="flex gap-3">
-            <a href="/admin" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dashboard</a>
-            <a href="/admin/posts" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Posts</a>
-            <a href="/admin/scheduling" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Scheduling</a>
-            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Content Dealers</a>
-            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dealer Review</a>
-            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-5xl mx-auto p-8">
         {/* Overview */}
-        <div className="mb-6 p-4 bg-white border-2 border-gray-200 rounded-lg">
+        <div className="mb-6 p-4 bg-white border border-border rounded-lg">
           <p className="text-gray-600">
             <strong>Content Dealers</strong> receive monthly content packages but post to their own Facebook pages.
             Use the tools below to manage welcome emails and content distribution.
@@ -49,10 +31,10 @@ export default function ContentDealersPage() {
 
         {/* Populate Mail Merge Section */}
         <div className="mb-8">
-          <div className="bg-white border-2 border-green-500 rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-green-600 px-6 py-4 border-b-2 border-green-700">
-              <h2 className="text-xl font-bold text-white">Populate Mail Merge</h2>
-              <p className="text-sm text-white/90 mt-1">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-text">Populate Mail Merge</h2>
+              <p className="text-sm text-gray-500 mt-1">
                 Add CONTENT dealers to the welcome email spreadsheet
               </p>
             </div>
@@ -78,7 +60,7 @@ export default function ContentDealersPage() {
                     }
                   }}
                   disabled={loadingMailMerge}
-                  className="px-6 py-3 bg-green-100 text-green-700 font-medium rounded-lg hover:bg-green-200 disabled:bg-gray-200 disabled:text-gray-500 transition-colors"
+                  className="px-6 py-3 bg-brand/10 text-brand font-medium rounded-lg hover:bg-brand/20 disabled:bg-gray-200 disabled:text-gray-500 transition-colors"
                 >
                   {loadingMailMerge ? 'Loading...' : 'Preview Dealers'}
                 </button>
@@ -111,7 +93,7 @@ export default function ContentDealersPage() {
                       }
                     }}
                     disabled={populatingMailMerge}
-                    className="px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-3 bg-brand text-white font-medium rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {populatingMailMerge ? 'Adding...' : `Add ${mailMergePreview.toAdd} Dealers to Spreadsheet`}
                   </button>
@@ -121,7 +103,7 @@ export default function ContentDealersPage() {
                   href="https://docs.google.com/spreadsheets/d/1_FCqDNpssdWZ32o6ORSxuZ0BS8RFORh6AWojHxMCfas/edit#gid=1885240601"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-3 text-green-600 hover:text-green-800 font-medium transition-colors"
+                  className="px-4 py-3 text-brand hover:text-brand-dark font-medium transition-colors"
                 >
                   Open Spreadsheet
                 </a>
@@ -199,11 +181,10 @@ export default function ContentDealersPage() {
         </div>
 
         {/* Future: Monthly Content Distribution could go here */}
-        <div className="p-6 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500">
+        <div className="p-6 bg-gray-100 border border-dashed border-border rounded-lg text-center text-gray-500">
           <p className="text-lg font-medium mb-2">Monthly Content Distribution</p>
           <p className="text-sm">Coming soon: Tools for sending monthly content packages to CONTENT dealers.</p>
         </div>
       </div>
-    </div>
   );
 }

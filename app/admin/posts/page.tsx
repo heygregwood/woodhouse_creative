@@ -198,33 +198,15 @@ export default function PostsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Posts</h1>
-          </div>
-          <div className="flex gap-3">
-            <a href="/admin" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dashboard</a>
-            <a href="/admin/posts" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Posts</a>
-            <a href="/admin/scheduling" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Scheduling</a>
-            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Content Dealers</a>
-            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dealer Review</a>
-            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto p-8">
         {/* Create New Post Section */}
         <div className="mb-8">
-          <div className="bg-white border-2 border-emerald-500 rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-emerald-500 px-6 py-4 border-b-2 border-emerald-600">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-white">Create New Post</h2>
-                  <p className="text-sm text-white/90 mt-1">
+                  <h2 className="text-lg font-semibold text-text">Create New Post</h2>
+                  <p className="text-sm text-gray-500 mt-1">
                     Add post to Firestore, populate spreadsheet, and create render jobs - all in one step
                   </p>
                 </div>
@@ -232,7 +214,7 @@ export default function PostsPage() {
                   href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                  className="text-xs px-3 py-1.5 text-brand hover:text-brand-dark transition-colors"
                 >
                   Open Spreadsheet
                 </a>
@@ -246,7 +228,7 @@ export default function PostsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Post Number</label>
                   <input
                     type="number"
-                    className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none"
                     value={newPostNumber}
                     onChange={(e) => setNewPostNumber(e.target.value)}
                     placeholder="673"
@@ -256,7 +238,7 @@ export default function PostsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Creatomate Template ID</label>
                   <input
                     type="text"
-                    className="w-full p-2 border-2 border-gray-300 rounded-lg font-mono text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    className="w-full p-2 border border-gray-300 rounded-lg font-mono text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none"
                     value={newPostTemplateId}
                     onChange={(e) => setNewPostTemplateId(e.target.value)}
                     placeholder="abc123-def456-..."
@@ -270,21 +252,21 @@ export default function PostsPage() {
                   <label className="block text-sm font-medium text-gray-700">Base Post Copy</label>
                   <div className="flex gap-1">
                     <span className="text-xs text-gray-500 mr-2">Insert:</span>
-                    <button type="button" onClick={() => insertNewPostVariable('{name}')} className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium">Name</button>
-                    <button type="button" onClick={() => insertNewPostVariable('{phone}')} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium">Phone</button>
-                    <button type="button" onClick={() => insertNewPostVariable('{website}')} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors font-medium">Website</button>
+                    <button type="button" onClick={() => insertNewPostVariable('{name}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Name</button>
+                    <button type="button" onClick={() => insertNewPostVariable('{phone}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Phone</button>
+                    <button type="button" onClick={() => insertNewPostVariable('{website}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Website</button>
                   </div>
                 </div>
                 <textarea
                   id="newPostBaseCopyTextarea"
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none resize-none"
                   rows={4}
                   value={newPostBaseCopy}
                   onChange={(e) => setNewPostBaseCopy(e.target.value)}
                   placeholder="Enter post copy here. Use the buttons above to insert variables like {name}, {phone}, or {website}."
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Variables: <code className="bg-purple-100 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-blue-100 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-green-100 px-1 rounded">{'{website}'}</code> = Website
+                  Variables: <code className="bg-brand/10 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-brand/10 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-brand/10 px-1 rounded">{'{website}'}</code> = Website
                 </p>
               </div>
 
@@ -292,7 +274,7 @@ export default function PostsPage() {
               <button
                 onClick={handleCreatePost}
                 disabled={creatingPost || !newPostNumber || !newPostTemplateId || !newPostBaseCopy}
-                className="w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
+                className="w-full px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
               >
                 {creatingPost ? 'Creating Post...' : 'Create Post & Start Renders'}
               </button>
@@ -320,24 +302,24 @@ export default function PostsPage() {
 
         {/* View Existing Posts Section */}
         <div className="mb-8">
-          <div className="bg-white border-2 border-purple-500 rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
             <div
-              className="bg-purple-600 px-6 py-4 border-b-2 border-purple-700 flex justify-between items-center cursor-pointer"
+              className="px-6 py-4 border-b border-border flex justify-between items-center cursor-pointer"
               onClick={() => setShowViewPosts(!showViewPosts)}
             >
               <div>
-                <h2 className="text-xl font-bold text-white">View Existing Posts</h2>
-                <p className="text-sm text-white/90 mt-1">{existingPosts.length} posts in database</p>
+                <h2 className="text-lg font-semibold text-text">View Existing Posts</h2>
+                <p className="text-sm text-gray-500 mt-1">{existingPosts.length} posts in database</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={(e) => { e.stopPropagation(); fetchExistingPosts(); }}
                   disabled={loadingPosts}
-                  className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 disabled:bg-gray-200 font-medium transition-colors"
+                  className="px-4 py-2 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 disabled:bg-gray-200 font-medium transition-colors"
                 >
                   {loadingPosts ? 'Loading...' : 'Refresh'}
                 </button>
-                <span className="text-white text-2xl">{showViewPosts ? '▼' : '▶'}</span>
+                <span className="text-text text-2xl">{showViewPosts ? '▼' : '▶'}</span>
               </div>
             </div>
 
@@ -348,7 +330,7 @@ export default function PostsPage() {
                   <input
                     type="text"
                     placeholder="Search by post number, template ID, or copy..."
-                    className="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none"
+                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none"
                     value={postSearchQuery}
                     onChange={(e) => setPostSearchQuery(e.target.value)}
                   />
@@ -358,7 +340,7 @@ export default function PostsPage() {
                         if (!postThumbnails[post.postNumber]) fetchPostThumbnail(post.postNumber);
                       });
                     }}
-                    className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors whitespace-nowrap"
+                    className="px-4 py-2 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors whitespace-nowrap"
                   >
                     Find Videos
                   </button>
@@ -375,7 +357,7 @@ export default function PostsPage() {
                 ) : (
                   <div className="space-y-3 max-h-[600px] overflow-y-auto">
                     {filteredPosts.map((post) => (
-                      <div key={post.postNumber} className="border-2 border-gray-200 rounded-lg overflow-hidden hover:border-purple-300 transition-colors">
+                      <div key={post.postNumber} className="border border-border rounded-lg overflow-hidden hover:border-brand transition-colors">
                         {/* Post Header - Always visible */}
                         <div className="bg-gray-50 px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => togglePostExpanded(post.postNumber)}>
                           <div className="flex items-center gap-4">
@@ -421,7 +403,7 @@ export default function PostsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <a href={`https://creatomate.com/projects/${CREATOMATE_PROJECT_ID}/templates/${post.templateId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">Open in Creatomate</a>
+                            <a href={`https://creatomate.com/projects/${CREATOMATE_PROJECT_ID}/templates/${post.templateId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-3 py-1.5 text-sm bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors">Open in Creatomate</a>
                             <span className="text-gray-400 text-xl">{expandedPosts.has(post.postNumber) ? '▼' : '▶'}</span>
                           </div>
                         </div>
@@ -450,21 +432,21 @@ export default function PostsPage() {
 
         {/* Generate Copy Deck PDF Section */}
         <div className="mb-8">
-          <div className="bg-white border-2 border-[#12ace2] rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-[#12ace2] px-6 py-4 border-b-2 border-[#1e78ab]">
-              <h2 className="text-xl font-bold text-white">Generate Copy Deck PDF</h2>
-              <p className="text-sm text-white/90 mt-1">Create PDF with thumbnails and post copy for content dealers</p>
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-text">Generate Copy Deck PDF</h2>
+              <p className="text-sm text-gray-500 mt-1">Create PDF with thumbnails and post copy for content dealers</p>
             </div>
 
             <div className="p-6">
               <div className="flex flex-wrap items-end gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Start Post</label>
-                  <input type="number" className="w-24 p-3 border-2 border-gray-300 rounded-lg focus:border-[#12ace2] focus:ring-2 focus:ring-[#12ace2]/20 outline-none" value={pdfStartPost} onChange={(e) => setPdfStartPost(e.target.value)} placeholder="666" />
+                  <input type="number" className="w-24 p-3 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={pdfStartPost} onChange={(e) => setPdfStartPost(e.target.value)} placeholder="666" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">End Post</label>
-                  <input type="number" className="w-24 p-3 border-2 border-gray-300 rounded-lg focus:border-[#12ace2] focus:ring-2 focus:ring-[#12ace2]/20 outline-none" value={pdfEndPost} onChange={(e) => setPdfEndPost(e.target.value)} placeholder="682" />
+                  <input type="number" className="w-24 p-3 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={pdfEndPost} onChange={(e) => setPdfEndPost(e.target.value)} placeholder="682" />
                 </div>
                 <button
                   onClick={async () => {
@@ -499,7 +481,7 @@ export default function PostsPage() {
                     }
                   }}
                   disabled={generatingPdf || !pdfStartPost || !pdfEndPost}
-                  className="px-6 py-3 bg-[#12ace2] text-white font-medium rounded-lg hover:bg-[#1e78ab] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-3 bg-brand text-white font-medium rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {generatingPdf ? 'Generating...' : 'Download PDF'}
                 </button>
@@ -516,6 +498,5 @@ export default function PostsPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

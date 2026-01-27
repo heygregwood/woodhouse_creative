@@ -438,7 +438,7 @@ export default function SchedulingPage() {
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="text-[#5378a8] ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+    return <span className="text-brand ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
   };
 
   const statusCounts = spreadsheetStatus?.dealers.reduce(
@@ -447,36 +447,18 @@ export default function SchedulingPage() {
   ) || {};
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-[#5378a8] text-white py-6 px-8 border-b-4 border-[#c87a3e]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Scheduling</h1>
-          </div>
-          <div className="flex gap-3">
-            <a href="/admin" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dashboard</a>
-            <a href="/admin/posts" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Posts</a>
-            <a href="/admin/scheduling" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Scheduling</a>
-            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Content Dealers</a>
-            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dealer Review</a>
-            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto p-8">
         {/* Status Summary Cards */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 text-center">
+          <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-4 text-center">
             <p className="text-3xl font-bold text-yellow-700">{statusCounts['Pending'] || 0}</p>
             <p className="text-sm font-medium text-yellow-800">Pending</p>
           </div>
-          <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 text-center">
+          <div className="bg-green-50 border border-green-400 rounded-lg p-4 text-center">
             <p className="text-3xl font-bold text-green-700">{statusCounts['Done'] || 0}</p>
             <p className="text-sm font-medium text-green-800">Done</p>
           </div>
-          <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4 text-center">
+          <div className="bg-blue-50 border border-blue-400 rounded-lg p-4 text-center">
             <p className="text-3xl font-bold text-blue-700">{statusCounts['Email Sent'] || 0}</p>
             <p className="text-sm font-medium text-blue-800">Email Sent</p>
           </div>
@@ -484,14 +466,14 @@ export default function SchedulingPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Process Scheduled Emails */}
-          <div className="bg-white border-2 border-green-500 rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-green-500 px-6 py-4 border-b-2 border-green-600">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-white">Process Scheduled Emails</h2>
-                  <p className="text-sm text-white/90 mt-1">Send emails to dealers with &quot;Done&quot; status</p>
+                  <h2 className="text-lg font-semibold text-text">Process Scheduled Emails</h2>
+                  <p className="text-sm text-gray-500 mt-1">Send emails to dealers with &quot;Done&quot; status</p>
                 </div>
-                <a href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY" target="_blank" rel="noopener noreferrer" className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors">Open Spreadsheet</a>
+                <a href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY" target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-1 text-brand hover:text-brand-dark transition-colors">Open Spreadsheet</a>
               </div>
             </div>
             <div className="p-6">
@@ -556,10 +538,10 @@ export default function SchedulingPage() {
           </div>
 
           {/* Batch Video Render */}
-          <div className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-[#c87a3e] px-6 py-4 border-b-2 border-[#000000]">
-              <h2 className="text-xl font-bold text-white">Batch Video Render</h2>
-              <p className="text-sm text-white/90 mt-1">Render videos via Creatomate</p>
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-text">Batch Video Render</h2>
+              <p className="text-sm text-gray-500 mt-1">Render videos via Creatomate</p>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-3">
@@ -569,15 +551,15 @@ export default function SchedulingPage() {
                 </div>
                 {batchInputs.map((batch, index) => (
                   <div key={index} className="flex gap-2 items-center">
-                    <input type="number" className="w-24 p-2 border-2 border-gray-300 rounded-lg focus:border-[#5378a8] focus:ring-2 focus:ring-[#5378a8]/20 outline-none text-sm" value={batch.postNumber} onChange={(e) => handleBatchChange(index, 'postNumber', e.target.value)} placeholder="Post #" />
-                    <input type="text" className="flex-1 p-2 border-2 border-gray-300 rounded-lg font-mono text-xs focus:border-[#5378a8] focus:ring-2 focus:ring-[#5378a8]/20 outline-none" value={batch.templateId} onChange={(e) => handleBatchChange(index, 'templateId', e.target.value)} placeholder="Creatomate Template ID" />
+                    <input type="number" className="w-24 p-2 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none text-sm" value={batch.postNumber} onChange={(e) => handleBatchChange(index, 'postNumber', e.target.value)} placeholder="Post #" />
+                    <input type="text" className="flex-1 p-2 border border-gray-300 rounded-lg font-mono text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={batch.templateId} onChange={(e) => handleBatchChange(index, 'templateId', e.target.value)} placeholder="Creatomate Template ID" />
                     {batchInputs.length > 1 && (
                       <button onClick={() => handleRemoveBatch(index)} className="p-2 text-red-500 hover:bg-red-50 rounded">&times;</button>
                     )}
                   </div>
                 ))}
               </div>
-              <button onClick={handleStartRender} disabled={rendering || batchInputs.every(b => !b.postNumber || !b.templateId)} className="w-full px-6 py-3 bg-[#c87a3e] text-white rounded-lg hover:bg-[#b36a35] disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors">
+              <button onClick={handleStartRender} disabled={rendering || batchInputs.every(b => !b.postNumber || !b.templateId)} className="w-full px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors">
                 {rendering ? 'Starting Render...' : `Start Batch Render (${batchInputs.filter(b => b.postNumber && b.templateId).length} post${batchInputs.filter(b => b.postNumber && b.templateId).length !== 1 ? 's' : ''})`}
               </button>
               {renderResult && (
@@ -597,10 +579,10 @@ export default function SchedulingPage() {
                 </div>
               )}
               {batchIds.length > 0 && (
-                <div className="border border-[#5378a8] rounded-lg p-4 bg-[#d7e7fd]">
+                <div className="border border-border rounded-lg p-4 bg-brand/5">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-bold text-gray-900">Status ({batchIds.length} batch{batchIds.length !== 1 ? 'es' : ''})</h3>
-                    <button onClick={handleCheckStatus} className="px-3 py-1 bg-[#5378a8] text-white rounded text-sm hover:bg-[#4a6890]">Refresh</button>
+                    <button onClick={handleCheckStatus} className="px-3 py-1 bg-brand text-white rounded text-sm hover:bg-brand-dark">Refresh</button>
                   </div>
                   <div className="space-y-3">
                     {batchIds.map((batchId) => {
@@ -613,7 +595,7 @@ export default function SchedulingPage() {
                           </div>
                           {status && !status.error && status.progress && (
                             <div className="grid grid-cols-4 gap-2">
-                              <div className="text-center"><p className="text-lg font-bold text-[#5378a8]">{status.progress.total}</p><p className="text-xs text-gray-500">Total</p></div>
+                              <div className="text-center"><p className="text-lg font-bold text-brand">{status.progress.total}</p><p className="text-xs text-gray-500">Total</p></div>
                               <div className="text-center"><p className="text-lg font-bold text-green-600">{status.progress.completed}</p><p className="text-xs text-gray-500">Done</p></div>
                               <div className="text-center"><p className="text-lg font-bold text-yellow-600">{status.progress.pending + status.progress.processing}</p><p className="text-xs text-gray-500">Pending</p></div>
                               <div className="text-center"><p className="text-lg font-bold text-red-600">{status.progress.failed}</p><p className="text-xs text-gray-500">Failed</p></div>
@@ -632,21 +614,21 @@ export default function SchedulingPage() {
 
         {/* Populate Post Copy Section */}
         <div className="mb-6">
-          <div className="bg-white border-2 border-purple-500 rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-purple-500 px-6 py-4 border-b-2 border-purple-600">
+          <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-white">Populate Post Copy</h2>
-                  <p className="text-sm text-white/90 mt-1">Fill in personalized copy for all dealers in the scheduling spreadsheet</p>
+                  <h2 className="text-lg font-semibold text-text">Populate Post Copy</h2>
+                  <p className="text-sm text-gray-500 mt-1">Fill in personalized copy for all dealers in the scheduling spreadsheet</p>
                 </div>
-                <a href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY" target="_blank" rel="noopener noreferrer" className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-colors">Open Spreadsheet</a>
+                <a href="https://docs.google.com/spreadsheets/d/1KuyojiujcaxmyJeBIxExG87W2AwM3LM1awqWO9u44PY" target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-1 text-brand hover:text-brand-dark transition-colors">Open Spreadsheet</a>
               </div>
             </div>
             <div className="p-6 space-y-4">
               <div className="flex gap-3 items-end">
                 <div className="w-32">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Post #</label>
-                  <input type="number" className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none" value={populatePostNumber} onChange={(e) => setPopulatePostNumber(e.target.value)} placeholder="666" />
+                  <input type="number" className="w-full p-2 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={populatePostNumber} onChange={(e) => setPopulatePostNumber(e.target.value)} placeholder="666" />
                 </div>
               </div>
               <div>
@@ -654,26 +636,26 @@ export default function SchedulingPage() {
                   <label className="block text-sm font-medium text-gray-700">Post Copy</label>
                   <div className="flex gap-1">
                     <span className="text-xs text-gray-500 mr-2">Insert:</span>
-                    <button type="button" onClick={() => insertVariable('{name}')} className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium">Name</button>
-                    <button type="button" onClick={() => insertVariable('{phone}')} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium">Phone</button>
-                    <button type="button" onClick={() => insertVariable('{website}')} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors font-medium">Website</button>
+                    <button type="button" onClick={() => insertVariable('{name}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Name</button>
+                    <button type="button" onClick={() => insertVariable('{phone}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Phone</button>
+                    <button type="button" onClick={() => insertVariable('{website}')} className="px-2 py-1 text-xs bg-brand/10 text-brand rounded hover:bg-brand/20 transition-colors font-medium">Website</button>
                   </div>
                 </div>
-                <textarea id="baseCopyTextarea" className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none resize-none" rows={4} value={populateBaseCopy} onChange={(e) => setPopulateBaseCopy(e.target.value)} placeholder="Enter post copy here. Use the buttons above to insert variables like {name}, {phone}, or {website}." />
-                <p className="text-xs text-gray-500 mt-1">Variables will be replaced with each dealer&apos;s values: <code className="bg-purple-100 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-blue-100 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-green-100 px-1 rounded">{'{website}'}</code> = Website</p>
+                <textarea id="baseCopyTextarea" className="w-full p-3 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none resize-none" rows={4} value={populateBaseCopy} onChange={(e) => setPopulateBaseCopy(e.target.value)} placeholder="Enter post copy here. Use the buttons above to insert variables like {name}, {phone}, or {website}." />
+                <p className="text-xs text-gray-500 mt-1">Variables will be replaced with each dealer&apos;s values: <code className="bg-brand/10 px-1 rounded">{'{name}'}</code> = Display Name, <code className="bg-brand/10 px-1 rounded">{'{phone}'}</code> = Phone, <code className="bg-brand/10 px-1 rounded">{'{website}'}</code> = Website</p>
               </div>
               <div className="flex gap-3">
                 <button onClick={handlePreviewPopulate} disabled={populateLoading || !populatePostNumber || !populateBaseCopy} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 font-medium transition-colors">{populateLoading ? 'Loading...' : 'Preview'}</button>
-                <button onClick={handlePopulatePostCopy} disabled={populateLoading || !populatePostNumber || !populateBaseCopy} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-300 font-medium transition-colors">{populateLoading ? 'Populating...' : 'Populate All Dealers'}</button>
+                <button onClick={handlePopulatePostCopy} disabled={populateLoading || !populatePostNumber || !populateBaseCopy} className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:bg-gray-300 font-medium transition-colors">{populateLoading ? 'Populating...' : 'Populate All Dealers'}</button>
               </div>
               {populateResult && (
                 <div>
                   {populateResult.error ? (
                     <div className="p-4 bg-red-50 border border-red-500 rounded-lg text-red-800"><p className="font-medium">Error</p><p className="text-sm mt-1">{populateResult.error}</p></div>
                   ) : (
-                    <div className={`p-4 rounded-lg ${populateResult.dryRun ? 'bg-purple-50 border border-purple-400' : 'bg-green-50 border border-green-500'}`}>
-                      <p className={`font-medium ${populateResult.dryRun ? 'text-purple-800' : 'text-green-800'}`}>{populateResult.dryRun ? 'Preview' : 'Success!'}</p>
-                      <p className={`text-sm mt-1 ${populateResult.dryRun ? 'text-purple-700' : 'text-green-700'}`}>{populateResult.message}</p>
+                    <div className={`p-4 rounded-lg ${populateResult.dryRun ? 'bg-brand/5 border border-brand' : 'bg-green-50 border border-green-500'}`}>
+                      <p className={`font-medium ${populateResult.dryRun ? 'text-text' : 'text-green-800'}`}>{populateResult.dryRun ? 'Preview' : 'Success!'}</p>
+                      <p className={`text-sm mt-1 ${populateResult.dryRun ? 'text-gray-700' : 'text-green-700'}`}>{populateResult.message}</p>
                       {populateResult.preview && populateResult.preview.length > 0 && (
                         <div className="mt-3">
                           <p className="text-xs font-medium text-gray-500 mb-2">Sample Output (first 5 dealers):</p>
@@ -694,13 +676,13 @@ export default function SchedulingPage() {
         </div>
 
         {/* Dealer Status Table */}
-        <div className="bg-white border-2 border-[#5378a8] rounded-lg shadow-lg overflow-hidden">
-          <div className="bg-[#74a9de] px-6 py-4 border-b-2 border-[#5378a8] flex justify-between items-center">
+        <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-bold text-black">Dealer Status</h2>
-              <p className="text-sm text-black/70 mt-1">{spreadsheetStatus?.dealers.length || 0} dealers</p>
+              <h2 className="text-lg font-semibold text-text">Dealer Status</h2>
+              <p className="text-sm text-gray-500 mt-1">{spreadsheetStatus?.dealers.length || 0} dealers</p>
             </div>
-            <button onClick={fetchSpreadsheetStatus} disabled={loadingStatus} className="px-4 py-2 bg-white text-[#5378a8] rounded-lg hover:bg-gray-100 disabled:bg-gray-200 font-medium transition-colors">
+            <button onClick={fetchSpreadsheetStatus} disabled={loadingStatus} className="px-4 py-2 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 disabled:bg-gray-200 font-medium transition-colors">
               {loadingStatus ? 'Loading...' : 'Refresh'}
             </button>
           </div>
@@ -756,6 +738,5 @@ export default function SchedulingPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
