@@ -75,23 +75,32 @@ export async function GET() {
     console.error('[test-graph-api] Error:', error);
 
     // Extract detailed error info
-    const errorDetails: any = {
+    const errorDetails: {
+      message: string;
+      type: string | undefined;
+      statusCode?: number;
+      code?: string;
+      body?: unknown;
+    } = {
       message: error instanceof Error ? error.message : 'Unknown error',
-      type: error?.constructor?.name,
+      type: error instanceof Error ? error.constructor.name : undefined,
     };
 
     // Try to get Graph API error details
-    if ((error as any).statusCode) {
-      errorDetails.statusCode = (error as any).statusCode;
-    }
-    if ((error as any).code) {
-      errorDetails.code = (error as any).code;
-    }
-    if ((error as any).body) {
-      try {
-        errorDetails.body = JSON.parse((error as any).body);
-      } catch {
-        errorDetails.body = (error as any).body;
+    if (error && typeof error === 'object') {
+      const errObj = error as Record<string, unknown>;
+      if ('statusCode' in errObj && typeof errObj.statusCode === 'number') {
+        errorDetails.statusCode = errObj.statusCode;
+      }
+      if ('code' in errObj && typeof errObj.code === 'string') {
+        errorDetails.code = errObj.code;
+      }
+      if ('body' in errObj) {
+        try {
+          errorDetails.body = typeof errObj.body === 'string' ? JSON.parse(errObj.body) : errObj.body;
+        } catch {
+          errorDetails.body = errObj.body;
+        }
       }
     }
 

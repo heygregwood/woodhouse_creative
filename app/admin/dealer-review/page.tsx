@@ -43,9 +43,9 @@ interface ApprovalResult {
   dealer_no?: string;
   spreadsheet?: { success: boolean; column: string };
   postsPopulated?: number;
-  postPopulateErrors?: any[];
+  postPopulateErrors?: { postNumber: number; error: string }[];
   renderBatches?: string[];
-  renderBatchErrors?: any[];
+  renderBatchErrors?: { postNumber: number; error: string }[];
   email?: { success: boolean };
   oliviaEmail?: { success: boolean };
   warnings?: string[];
@@ -323,30 +323,12 @@ export default function DealerReviewPage() {
             <h1 className="text-3xl font-bold">Woodhouse Creative Admin</h1>
           </div>
           <div className="flex gap-3">
-            <a
-              href="/admin"
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
-            >
-              Dashboard
-            </a>
-            <a
-              href="/admin/posts"
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
-            >
-              Posts
-            </a>
-            <a
-              href="/admin/email-templates"
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium"
-            >
-              Email Templates
-            </a>
-            <a
-              href="/admin/dealer-review"
-              className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium"
-            >
-              Dealer Review
-            </a>
+            <a href="/admin" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Dashboard</a>
+            <a href="/admin/posts" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Posts</a>
+            <a href="/admin/scheduling" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Scheduling</a>
+            <a href="/admin/content-dealers" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Content Dealers</a>
+            <a href="/admin/dealer-review" className="px-4 py-2 bg-white/40 rounded-lg hover:bg-white/50 transition-colors font-medium">Dealer Review</a>
+            <a href="/admin/email-templates" className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors font-medium">Email Templates</a>
           </div>
         </div>
       </div>
