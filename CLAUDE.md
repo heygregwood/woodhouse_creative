@@ -160,6 +160,195 @@ The Excel sync bug happened because column mapping changed from `dealer_no: 0` t
 
 ---
 
+## Documentation System for AI Agents
+
+**Purpose:** Ensure AI agents have complete context when making code changes, preventing errors like suggesting tests for deprecated code or missing doc updates.
+
+**Context:** Greg is a non-technical founder using AI agents to build. AI agents handle ALL documentation updates automatically - Greg never manually updates docs.
+
+---
+
+## AI Agent MANDATORY Pre-Test Checklist
+
+**Before asking "Ready to test?", Claude MUST complete ALL steps:**
+
+### 1. Build the Feature/Fix
+- Write code
+- Ask business questions if needed ("What should happen when...?")
+
+### 2. Update Documentation (AUTOMATIC - Don't ask Greg)
+
+**Tier 1 (ALWAYS):**
+- ✅ Update `CHANGELOG.md` with entry including:
+  - What changed
+  - Deprecated code (if any)
+  - Testing steps (if non-trivial)
+
+**Tier 2 (When Relevant):**
+- ✅ Update `docs/engineering/API_REFERENCE.md` if API endpoint changed
+- ✅ Update `docs/engineering/DATA_MODEL.md` if Firestore/SQLite schema changed
+- ✅ Update `docs/engineering/EXCEL_SYNC_REFERENCE.md` if column mappings changed
+- ✅ Update product specs in `docs/product/` if user-facing feature
+
+**Tier 3 (Major Changes Only):**
+- ✅ Update `CLAUDE.md` if workflow/process changed
+- ✅ Update `docs/engineering/TYPESCRIPT_MODULES.md` if new modules added
+- ✅ Update `docs/engineering/PYTHON_SCRIPTS.md` if new scripts added
+
+### 3. Inform Greg What Was Updated
+
+**Example:**
+```
+"I've updated the batch render to support the new template format.
+
+Documentation updated:
+- CHANGELOG.md (new entry)
+- API_REFERENCE.md (updated render-batch endpoint)
+- TYPESCRIPT_MODULES.md (new renderQueue functions)
+
+Ready to test on localhost?"
+```
+
+### 4. THEN Ask "Ready to test?"
+
+---
+
+## AI Agent Verification Checklist (Before Suggesting Tests)
+
+Before suggesting tests or making changes, Claude MUST:
+
+1. ✅ **Read product spec** for the area being changed (check `docs/product/`)
+2. ✅ **Check CHANGELOG.md** for recent changes in that area
+3. ✅ **Check engineering docs** for current data schemas and mappings
+4. ✅ **Trace code path** from entry point to verify flow is active
+5. ✅ **Provide complete flow** when asking to test (not just one page)
+
+**Example:**
+```
+❌ BAD: "Test /admin"
+✅ GOOD: "Test the batch render flow: Navigate to /admin → enter post number 700, select template. Click 'Start Render'. Verify the cron at /api/cron/process-render-queue picks up jobs. Check Drive folder for rendered videos."
+```
+
+---
+
+## Greg's Role (Business Decisions Only)
+
+**What Greg does:**
+1. Describe features from business perspective ("Add a new email template for content-ready dealers")
+2. Answer business questions ("What should the email say?")
+3. Test features when Claude asks
+4. Approve commits ("tests pass, push it")
+
+**What Greg does NOT do:**
+- Manually update documentation files
+- Remember to ask Claude to update docs
+- Understand technical documentation structure
+- Write CHANGELOG entries
+
+**Greg's only doc responsibility:** Verify Claude updated docs before approving commit
+
+---
+
+## Key Documentation Files
+
+| Doc | Purpose | Claude Updates When |
+|-----|---------|---------------------|
+| `CHANGELOG.md` | Every change | Every commit (ALWAYS) |
+| `docs/product/*` | Feature specs | User-facing features |
+| `docs/engineering/API_REFERENCE.md` | API endpoints | API changes |
+| `docs/engineering/DATA_MODEL.md` | Database schema | Firestore/SQLite changes |
+| `docs/engineering/EXCEL_SYNC_REFERENCE.md` | Column mappings | Excel sync changes |
+| `docs/engineering/PYTHON_SCRIPTS.md` | Script docs | New/modified scripts |
+| `docs/engineering/TYPESCRIPT_MODULES.md` | Module docs | New/modified modules |
+
+---
+
+## Example Conversation Flow
+
+**Greg:** "Add a new email template for when a dealer gets promoted to FULL"
+
+**Claude:**
+```
+Building FULL promotion email template...
+
+I need to know:
+1. What should the subject line be?
+2. Should we include next steps (e.g., "we'll start posting for you")?
+3. Should this auto-send on promotion or be manual from dashboard?
+
+[Greg answers business questions]
+
+Building:
+- Email template in templates/emails/full_promotion.html
+- Send function in scripts/email_sender/send_email.py
+- Dashboard trigger in /admin
+
+Updating documentation:
+- CHANGELOG.md (new entry)
+- docs/product/EMAIL_AUTOMATION.md (new template)
+- API_REFERENCE.md (if new endpoint)
+
+Ready to test on localhost?
+```
+
+**Greg:** Tests it
+
+**Greg:** "tests pass, push it"
+
+**Claude:** Commits everything (code + docs) together
+
+---
+
+## How This Prevents Issues
+
+**What happened in woodhouse_social (Jan 19, 2026):**
+1. Claude asked Greg to test `/onboarding/payment` (legacy code from Dec 2024)
+2. No documentation existed about free trial implementation
+3. Greg wasted time debugging non-issue
+
+**With this workflow:**
+1. When a feature is implemented, Claude automatically updates all docs
+2. Before suggesting tests, Claude checks docs for current state
+3. If code is deprecated, Claude sees it in docs and suggests the active flow instead
+
+**The Excel sync version:**
+The column mapping bug happened because docs weren't updated when code changed. With this workflow, doc updates are MANDATORY before commit.
+
+**Result:** No wasted time, no confusion, Greg never touches docs.
+
+---
+
+## Compliance Mechanism
+
+**If Claude forgets to update docs:**
+
+**Greg:** "did you update docs?"
+
+**Claude:** "You're right, let me update docs now before we commit." [Updates docs, shows what was updated, then commits]
+
+**That's it.** Greg only needs to ask once if Claude forgets. Over time, Claude learns to always do it.
+
+---
+
+## Sensitive Data & Temporary Files - CRITICAL
+
+**NEVER commit files that may contain dealer PII or sensitive data:**
+- CSV files with dealer emails, phones, contacts
+- Export files from Firestore or SQLite queries
+- Data dumps or backups
+- API response logs with dealer data
+- Excel files with Allied Air dealer information
+
+**Before committing, always check `git status` for:**
+1. Untracked files in `/data/`, `/exports/`, or `/scripts/`
+2. Any `.csv`, `.xlsx`, `.json` data files
+3. Scripts that query dealer data
+4. SQLite database files (`creative.db`)
+
+**If you create a temporary script:** Delete it after use, or ensure .gitignore catches it.
+
+---
+
 ## Development Workflow
 
 ```
@@ -220,6 +409,199 @@ git push
 - Before starting risky refactors
 - Every 30-60 minutes during long sessions
 - Before switching tasks
+
+---
+
+### Session Hooks (Context Continuity)
+
+**File:** `.claude/settings.local.json` (local only, not committed)
+
+Session hooks are configured to help with context continuity across Claude Code sessions:
+
+| Hook | Trigger | What It Does |
+|------|---------|--------------|
+| `PreCompact` | Before context compaction | Logs `[timestamp] Session compacted` to `docs/archive/sessions/session_log.txt` |
+| `SessionStart` | New session starts | Reads latest context from Firestore `claude_sessions` collection |
+
+**Configuration:**
+- `autoCompactThreshold: 30` - Auto-compacts after 30 conversation turns
+
+**Note:** These hooks are machine-local (globally gitignored). Each developer sets up their own.
+
+### Session Context Persistence (MANDATORY)
+
+**Purpose:** Long-term memory system that survives auto-compaction and enables recall of past work.
+
+**Firestore Collection:** `claude_sessions` (in DEFAULT database, shared with woodhouse_social)
+
+**Scripts:**
+- **Write:** `echo '{"summary": "...", "topics": [...]}' | node scripts/write-session-context.js`
+- **Read (SessionStart):** `node scripts/read-session-context.js` (runs automatically)
+- **Query:** `node scripts/recall-agent.js "batch render"` (semantic search)
+
+**Schema:**
+```typescript
+{
+  created_at: Timestamp,
+  machine: string,
+  repo: 'woodhouse_creative',
+  trigger: 'task_complete' | 'decision' | 'blocker' | 'topic_switch' | 'pre_compact' | 'periodic',
+
+  // Core (REQUIRED)
+  summary: string,           // What was accomplished
+
+  // AI-extracted metadata
+  topics: string[],          // DYNAMIC - extracted from conversation
+  decisions: string[],       // Key decisions made
+  blockers: string[],        // Issues preventing progress
+  entities: string[],        // Named things (Allied, Creatomate, components)
+  files_touched: string[],   // Files modified
+
+  // Status tracking
+  outcome: 'completed' | 'in_progress' | 'blocked' | 'abandoned',
+  user_request: string,      // Original ask that started work
+  commits: string[],         // Git SHAs
+  session_boundary: boolean, // true if at compact/session end
+
+  // Flexible
+  important_context: object
+}
+```
+
+---
+
+### Save Triggers (Event-Driven) - MANDATORY
+
+**MUST save (never skip):**
+- After completing any task or todo item (`trigger: 'task_complete'`)
+- After making a significant decision (`trigger: 'decision'`)
+- When hitting a blocker (`trigger: 'blocker'`)
+- Before switching to a different topic (`trigger: 'topic_switch'`)
+- Before user runs `/compact` (`trigger: 'pre_compact'`)
+
+**SHOULD save (when appropriate):**
+- After ~10 conversation turns if no other trigger
+- After modifying multiple files
+
+---
+
+### How to Save Session Context (MANDATORY)
+
+**CRITICAL:** Session saves are MANUAL. Hooks cannot access conversation content, so Claude must run the save command directly.
+
+**Command:**
+```bash
+echo '{"summary": "...", "topics": [...], "trigger": "task_complete", ...}' | node scripts/write-session-context.js
+```
+
+**For multi-task sessions using TodoWrite:**
+- Add "Save session context to Firestore" as the FINAL todo item
+- Mark it in_progress when starting the save
+- Mark it completed after the script runs successfully
+
+**Example todo list for multi-task session:**
+```
+1. [completed] Update batch render template mapping
+2. [completed] Fix email sender for FULL dealers
+3. [completed] Update CHANGELOG.md
+4. [in_progress] Save session context to Firestore  <-- Always last
+```
+
+**Why this matters:** Without manual saves, work is lost when auto-compaction occurs at 30 turns. The SessionStart hook only READS previous sessions - it cannot WRITE them.
+
+---
+
+### Summary Quality Guidelines
+
+**GOOD summary:**
+```
+"Updated batch render to support new holiday template.
+ Added template ID mapping in posts-template-mapping.json.
+ Tested with post 700 for dealer 10231005."
+```
+
+**BAD summary:**
+```
+"Worked on rendering. Made some changes."
+```
+
+**Required elements:**
+- WHAT was done (specific)
+- HOW it was done (technical approach)
+- WHY if not obvious
+
+---
+
+### Topic Extraction Guidelines
+
+Extract 2-5 topics from conversation content. Topics are **dynamic** - they emerge from what you're discussing, not a predefined list.
+
+**Naming consistency:**
+- Use "batch render" not "video rendering" or "creatomate renders"
+- Use "excel sync" not "spreadsheet sync" or "allied data"
+- Use "dealer onboarding" not "new dealer setup"
+- Use "email automation" not "resend emails" or "notifications"
+- Use "admin dashboard" not "admin panel" or "admin UI"
+
+---
+
+### Recall Trigger Patterns
+
+When user asks patterns like these, run the recall agent:
+- "where were we with X"
+- "last time we worked on X"
+- "did we ever discuss/implement X"
+- "what did we decide about X"
+- "pick up where we left off on X"
+
+**Command:** `node scripts/recall-agent.js "user's query here"`
+
+---
+
+### Citing Sources (MANDATORY)
+
+When answering questions about the project, ALWAYS cite where the information came from:
+
+**Format:**
+```
+**Sources:**
+- `claude_sessions` (Jan 25, 2026) - "summary excerpt..."
+- [CLAUDE.md:40-57](CLAUDE.md#L40-L57) - Section name
+- [docs/engineering/DATA_MODEL.md:20-35](docs/engineering/DATA_MODEL.md#L20-L35) - Table/section
+- Current conversation - if from this session
+```
+
+**Source types:**
+| Source | When to cite |
+|--------|--------------|
+| `claude_sessions` | When recall agent returned relevant sessions |
+| File paths with lines | When info comes from docs/code in context |
+| "Current conversation" | When referencing something said this session |
+| "No matching sessions" | When recall searched but found nothing |
+
+**Why:** Helps user understand what's documented vs. what's in session memory vs. what was just discussed.
+
+---
+
+### Example Save
+
+```json
+{
+  "summary": "Updated batch render to support new holiday template. Added template mapping for post 700. Fixed cron timing for render queue.",
+  "topics": ["batch render", "creatomate templates", "cron jobs"],
+  "decisions": ["Use 25 jobs/minute rate limit for Creatomate", "Archive old posts on new render completion"],
+  "blockers": [],
+  "entities": ["Creatomate", "Google Drive", "render queue"],
+  "files_touched": ["scripts/posts-template-mapping.json", "lib/renderQueue.ts", "app/api/cron/process-render-queue/route.ts"],
+  "outcome": "completed",
+  "user_request": "Add holiday template support to batch render",
+  "commits": ["abc1234"],
+  "session_boundary": false,
+  "trigger": "task_complete"
+}
+```
+
+**Why this matters:** Auto-compaction happens without warning at 30 turns. Continuous saves + recall agent enable true long-term memory across sessions.
 
 ---
 
@@ -490,6 +872,7 @@ docs/
 | Post Scheduled | Ongoing post notifications | `templates/emails/post_scheduled.html` |
 | Content Ready | Monthly content for CONTENT dealers | `templates/emails/content_ready.html` |
 | Holiday | Seasonal campaigns | `templates/emails/holiday.html` |
+| Onboarding Complete | After dealer onboarding is finalized | `templates/emails/onboarding_complete.html` |
 
 **Scripts:**
 - `scripts/email_sender/send_email.py` - Main email sending module
@@ -546,6 +929,35 @@ docs/
 - Archive subfolders are created automatically in each dealer's Drive folder
 - Integrated into webhook handler: [route.ts:188-200](app/api/webhooks/creatomate/route.ts#L188-L200)
 
+### 9. Create Post One-Click Workflow
+- Full end-to-end post creation from admin dashboard
+- Select Creatomate template, enter post number and copy
+- Automatically: creates post record, adds to spreadsheet, populates personalized copy, triggers batch renders
+- API: `/api/admin/create-post`
+
+### 10. Copy Deck PDF Generation
+- Generates PDF copy decks for CONTENT dealers
+- Includes video thumbnails from Cloudinary
+- Lists post numbers and personalized copy per dealer
+- API: `/api/admin/generate-copy-deck`
+- Lib: `lib/cloudinary.ts`
+
+### 11. Email Delivery Tracking (Resend Webhooks)
+- Tracks email delivery status: delivered, opened, clicked, bounced, complained
+- Resend sends webhooks to `/api/webhooks/resend`
+- Status queryable via `/api/admin/email-status`
+- Displayed in scheduling page dealer status table
+
+### 12. Mail Merge Automation
+- Populates mail merge spreadsheet with CONTENT/NEW dealers from Firestore
+- Used for welcome email automation workflow
+- API: `/api/admin/populate-mail-merge`
+
+### 13. Post Thumbnails
+- Fetches video thumbnails from Google Drive by post number
+- Proxies through server for display in admin dashboard
+- APIs: `/api/admin/post-thumbnail`, `/api/admin/post-thumbnail-image`
+
 ---
 
 ## Google Apps Scripts (External)
@@ -578,45 +990,57 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 
 ## Admin Dashboard Pages
 
-### `/admin` - Main Dashboard
-- **Excel Sync:** Preview/apply changes from Allied Excel (**LOCAL ONLY** - works on localhost, not Vercel production)
-- **Batch Render:** Submit post number + template for rendering
-- **Populate Post Copy:** Enter base copy with variable picker, populate to all dealer columns
-- **Process Done Emails:** Send emails to dealers marked "Done" in spreadsheet
-- **Quick Stats:** 124 FULL dealers, 656+ posts, 100% ready
+### `/admin` - Overview & Sync
+- **Excel Sync:** Preview/apply changes from Allied Excel (Microsoft Graph API - works on localhost and Vercel)
+- **Quick Stats:** FULL dealers, posts, ready-for-automate counts
+- **Navigation:** Cards linking to all other admin pages
 
-### `/admin/posts` - Post Workflow
-- Create/submit new posts with metadata
-- View scheduling spreadsheet status
-- Populate post copy to spreadsheet
+### `/admin/posts` - Post Management
+- **View Posts:** Search/filter existing posts with thumbnails from Google Drive
+- **Create New Post:** One-click workflow — select template, enter copy, renders for all FULL dealers
+- **Copy Deck PDF:** Generate PDF copy deck for CONTENT dealers with video thumbnails (Cloudinary)
+
+### `/admin/scheduling` - FULL Dealer Operations
+- **Dealer Status Table:** View all FULL dealers from scheduling spreadsheet with sorting
+- **Process Done Emails:** Send emails to dealers marked "Done" (auto-detects first_post vs post_scheduled)
+- **Batch Video Render:** Submit post number + template for batch rendering
+- **Populate Post Copy:** Enter base copy with variable picker, populate to all dealer columns
+- **Email Delivery Status:** Track delivered/opened/clicked/bounced status via Resend webhooks
+
+### `/admin/content-dealers` - CONTENT Dealer Operations
+- **Mail Merge:** Populate mail merge spreadsheet with CONTENT/NEW dealers from Firestore
+- **Welcome Email Automation:** Manage welcome email workflow for non-FULL dealers
 
 ### `/admin/dealer-review` - Dealer Review & Approval
 - List dealers pending review (promoted CONTENT → FULL)
 - Manual form for validating display name, phone, website, logo
 - Logo selector with Brandfetch + website scraping results
+- One-click permanent logo save to Google Drive
 
 ### `/admin/email-templates` - Email Template Editor
-- View/edit all 6 email templates
-- Preview rendered template
+- View/edit all 7 email templates
+- Preview rendered template with live data
 - Save changes back to disk
 
 ---
 
-## API Routes (26 Total)
+## API Routes (35 Total)
 
-### Admin Routes `/api/admin/` (18 endpoints)
+### Admin Routes `/api/admin/` (26 endpoints)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/dealers` | GET | Fetch dealers (filters: not-ready, no-logo, round2, all) |
-| `/sync-excel` | GET/POST | Preview/apply changes from Allied Excel (LOCAL ONLY - Python script) |
+| `/sync-excel` | GET/POST | Preview/apply changes from Allied Excel (Microsoft Graph API) |
 | `/dealer-review` | GET/POST | List pending dealers / approve after review |
 | `/dealer-status` | POST | Update dealer CONTENT ↔ FULL (from Gmail webhook) |
 | `/process-done` | GET/POST | Get/send emails to dealers marked "Done" |
 | `/email-templates` | GET/POST | List/fetch/save email templates |
+| `/email-status` | GET | Get email delivery status (delivered/opened/clicked/bounced) |
 | `/fetch-logos` | GET | Fetch logo options from Brandfetch + website |
 | `/save-logo` | POST | Save selected logo to creatomate_logo field |
 | `/save-logo-staging` | POST | Convert & upload logo to Drive staging folder (PNG) |
+| `/save-logo-permanent` | POST | Move logo from staging to permanent location |
 | `/proxy-image` | GET | Proxy images for canvas rendering |
 | `/mark-needs-design` | POST | Flag dealers needing logo redesign |
 | `/send-welcome-email` | POST | Send welcome email (calls Python script) |
@@ -624,15 +1048,22 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 | `/spreadsheet-status` | GET | Fetch scheduling spreadsheet data |
 | `/posts-excel` | GET | Fetch post archive spreadsheet |
 | `/submit-post` | POST | Submit new post to archive |
-| `/open-excel` | GET | Return link to Allied Excel |
+| `/create-post` | POST | Full workflow: create post, add to spreadsheet, populate copy, trigger renders |
 | `/populate-post-copy` | GET/POST | Preview/populate personalized post copy to all dealers |
+| `/populate-mail-merge` | POST | Populate mail merge spreadsheet with CONTENT/NEW dealers |
+| `/generate-copy-deck` | POST | Generate PDF copy deck with video thumbnails (Cloudinary) |
+| `/post-thumbnail` | GET | Fetch video thumbnail from Google Drive by post number |
+| `/post-thumbnail-image` | GET | Proxy Google Drive video thumbnails |
+| `/template-preview` | GET | Fetch Creatomate template details/preview URL |
+| `/test-graph-api` | GET | Test Microsoft Graph API connection |
 
-### Creative Automation Routes `/api/creative/` (5 endpoints)
+### Creative Automation Routes `/api/creative/` (6 endpoints)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/render-batch` | POST | Start batch render for post number |
 | `/render-batch` | GET | Get batch status by batchId |
+| `/active-batches` | GET | Get all non-completed render batches |
 | `/test-connection` | GET | Test Creatomate + Google Drive |
 | `/test-drive-auth` | GET | Test Google Drive auth |
 | `/manual-webhook` | POST | Manually trigger webhook (for testing) |
@@ -648,6 +1079,7 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/creatomate` | POST | Receive render completion notifications |
+| `/resend` | POST | Receive email delivery/open/click/bounce webhooks from Resend |
 
 ---
 
@@ -656,24 +1088,33 @@ const COLS = ['Brand', 'Distributor', 'BusinessName', 'FirstName', 'LastName',
 ```
 woodhouse_creative/
 ├── app/
-│   ├── admin/                  # Admin dashboard pages
-│   │   ├── page.tsx            # Main dashboard
-│   │   ├── posts/              # Post workflow
+│   ├── admin/                  # Admin dashboard pages (6 pages)
+│   │   ├── page.tsx            # Overview & sync dashboard
+│   │   ├── posts/              # Post management & copy deck
+│   │   ├── scheduling/         # FULL dealer ops (status, emails, renders)
+│   │   ├── content-dealers/    # CONTENT dealer ops (mail merge)
 │   │   ├── dealer-review/      # Dealer approval
 │   │   └── email-templates/    # Template editor
 │   └── api/
-│       ├── admin/              # Admin operations (17 endpoints)
-│       ├── creative/           # Render automation (7 endpoints)
+│       ├── admin/              # Admin operations (26 endpoints)
+│       ├── creative/           # Render automation (6 endpoints)
 │       ├── cron/               # Scheduled tasks
-│       └── webhooks/           # External callbacks
+│       └── webhooks/           # External callbacks (Creatomate, Resend)
 ├── lib/
 │   ├── firebase.ts             # Firestore connection
+│   ├── firestore-dealers.ts    # Dealer CRUD operations
 │   ├── creatomate.ts           # Creatomate API client
+│   ├── cloudinary.ts           # Cloudinary integration for video thumbnails
 │   ├── google-drive.ts         # Google Drive upload, archive, move files
-│   ├── renderQueue.ts          # Queue management (33 functions)
+│   ├── google-sheets.ts        # Google Sheets API operations
+│   ├── email.ts                # Email sending via Resend API
+│   ├── renderQueue.ts          # Queue management
+│   ├── blocked-dealers.ts      # Blocklist for test accounts
+│   ├── microsoft-auth.ts       # OAuth2 device code auth for Graph API
+│   ├── sync-excel.ts           # Excel sync implementation
 │   └── types/
 │       └── renderQueue.ts      # TypeScript interfaces
-├── scripts/                    # 59 Python/TypeScript automation scripts
+├── scripts/                    # Python/TypeScript automation scripts
 │   ├── email_sender/           # Email automation module
 │   │   ├── send_email.py       # Resend API + spreadsheet status update
 │   │   └── __init__.py
@@ -690,13 +1131,14 @@ woodhouse_creative/
 │   └── google_apps_script/     # Reference copies of Apps Scripts
 │       └── process_done_status.gs
 ├── templates/
-│   └── emails/                 # HTML email templates (6 total)
+│   └── emails/                 # HTML email templates (7 total)
 │       ├── welcome.html
 │       ├── fb_admin_accepted.html
 │       ├── first_post_scheduled.html
 │       ├── post_scheduled.html
 │       ├── content_ready.html
-│       └── holiday.html
+│       ├── holiday.html
+│       └── onboarding_complete.html
 ├── data/
 │   ├── sqlite/
 │   │   └── creative.db         # SQLite database (source of truth)
@@ -704,11 +1146,12 @@ woodhouse_creative/
 ├── docs/
 │   ├── README.md               # Start here
 │   ├── engineering/            # Technical docs (7 files)
-│   ├── product/                # Feature docs (5 files)
+│   ├── product/                # Feature docs (6 files)
 │   ├── playbook/               # Operational guides (5 files)
 │   └── archive/                # Historical docs (4 files)
 ├── public/
-│   └── template-bg.png         # Video template background for QA
+│   ├── template-bg.png         # Video template background for QA
+│   └── Logo/                   # Woodhouse brand logos
 └── logs/                       # Script execution logs
 ```
 
@@ -929,6 +1372,7 @@ GOOGLE_DRIVE_LOGOS_STAGING_FOLDER_ID=1Vht1Dlh-IbyFpxvACbLRN-bVNSRTsrex
 # APIs
 BRANDFETCH_API_KEY=
 RESEND_API_KEY=
+ANTHROPIC_API_KEY=               # Claude API (for recall agent semantic search)
 
 # Security
 CRON_SECRET=

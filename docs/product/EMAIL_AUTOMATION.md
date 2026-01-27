@@ -1,6 +1,6 @@
 # Email Automation
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 27, 2026
 
 ---
 
@@ -22,7 +22,8 @@ Automated emails are sent via Resend API to keep dealers informed about their so
 | First Post Scheduled | `first_post_scheduled.html` | First posts scheduled | Dealer contact |
 | Post Scheduled | `post_scheduled.html` | Ongoing post notifications | Dealer contact |
 | Content Ready | `content_ready.html` | Monthly content available | Dealer contact |
-| Onboarding Complete | (internal) | Dealer approved in review | Olivia |
+| Holiday | `holiday.html` | Seasonal campaigns | Dealer contact |
+| Onboarding Complete | `onboarding_complete.html` | Dealer approved in review | Olivia |
 
 ---
 
@@ -96,8 +97,8 @@ Automated emails are sent via Resend API to keep dealers informed about their so
 ### Onboarding Complete Email (Internal)
 
 **Trigger:** Dealer approved via dealer-review dashboard
+**Template:** `templates/emails/onboarding_complete.html`
 **Recipient:** Olivia (internal team)
-**No Template:** Generated inline
 
 **Content:**
 - Dealer name and number
@@ -110,7 +111,7 @@ Automated emails are sent via Resend API to keep dealers informed about their so
 
 ### Via Dashboard
 
-1. Navigate to `/admin`
+1. Navigate to `/admin/scheduling`
 2. Find "Process Done Emails" section
 3. Click "Send" for individual dealers
 4. Or click "Process All"
@@ -203,6 +204,27 @@ First Post Scheduled Email → first_post_email_sent
     ↓
 Post Scheduled Email → last_post_email_sent
 ```
+
+---
+
+## Email Delivery Tracking
+
+Email delivery status is tracked via Resend webhooks.
+
+**Webhook Endpoint:** `/api/webhooks/resend`
+**Query Endpoint:** `/api/admin/email-status`
+
+**Tracked Events:**
+| Event | Meaning |
+|-------|---------|
+| `delivered` | Email accepted by recipient's mail server |
+| `opened` | Recipient opened the email |
+| `clicked` | Recipient clicked a link in the email |
+| `bounced` | Email bounced (invalid address, full mailbox) |
+| `complained` | Recipient marked as spam |
+
+**Dashboard Integration:**
+The scheduling page (`/admin/scheduling`) displays delivery status icons next to dealer emails in the status table.
 
 ---
 

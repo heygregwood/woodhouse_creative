@@ -1,6 +1,6 @@
 # API Reference
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 27, 2026
 **Base URL:** `https://woodhouse-creative.vercel.app/api`
 **Local:** `http://localhost:3000/api`
 
@@ -8,11 +8,11 @@
 
 ## Overview
 
-28 API endpoints organized into admin, creative, cron, and webhook categories.
+35 API endpoints organized into admin, creative, cron, and webhook categories.
 
 ---
 
-## Admin Routes `/api/admin/` (19 endpoints)
+## Admin Routes `/api/admin/` (26 endpoints)
 
 ### Dealer Management
 
@@ -143,7 +143,7 @@ Flag dealers needing logo redesign.
 
 ---
 
-### Excel Sync (LOCAL ONLY)
+### Excel Sync (Microsoft Graph API)
 
 #### GET/POST `/api/admin/sync-excel`
 
@@ -161,7 +161,7 @@ Flag dealers needing logo redesign.
 
 **POST:** Apply changes to Firestore
 
-**Note:** Only works on localhost (requires Python + WSL OneDrive access).
+**Note:** Works on both localhost and Vercel via Microsoft Graph API with OAuth2 device code flow.
 
 ---
 
@@ -216,9 +216,9 @@ Send emails to multiple dealers.
 ---
 
 #### GET `/api/admin/email-status`
-Get email history for a dealer.
+Get email delivery status (delivered, opened, clicked, bounced, complained) for email addresses.
 
-**Query Parameters:** `dealer_no`
+**Query Parameters:** `emails` (comma-separated list of email addresses)
 
 ---
 
@@ -297,6 +297,68 @@ Submit new post to archive.
 
 ---
 
+#### POST `/api/admin/create-post`
+Full workflow: create post, add to spreadsheet, populate personalized copy, trigger batch renders.
+
+```json
+{
+  "post_number": 700,
+  "template_id": "abc123xyz",
+  "base_copy": "Call {name} at {phone}..."
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "postNumber": 700,
+  "dealerCount": 130,
+  "batches": [{ "batchId": "batch_abc123" }]
+}
+```
+
+---
+
+#### POST `/api/admin/generate-copy-deck`
+Generate PDF copy deck for CONTENT dealers with video thumbnails (Cloudinary).
+
+```json
+{
+  "post_numbers": [700, 701, 702]
+}
+```
+
+**Response:** PDF file download
+
+---
+
+#### POST `/api/admin/populate-mail-merge`
+Populate mail merge spreadsheet with CONTENT/NEW dealers from Firestore for welcome email automation.
+
+---
+
+#### GET `/api/admin/post-thumbnail`
+Fetch video thumbnail metadata from Google Drive by post number.
+
+**Query Parameters:** `postNumber`
+
+---
+
+#### GET `/api/admin/post-thumbnail-image`
+Proxy Google Drive video thumbnails through server.
+
+**Query Parameters:** `fileId`
+
+---
+
+#### GET `/api/admin/template-preview`
+Fetch Creatomate template details including preview/snapshot URL.
+
+**Query Parameters:** `templateId`
+
+---
+
 ### Utility
 
 #### GET `/api/admin/proxy-image`
@@ -311,7 +373,7 @@ Test Microsoft Graph API connection (for debugging).
 
 ---
 
-## Creative Routes `/api/creative/` (5 endpoints)
+## Creative Routes `/api/creative/` (6 endpoints)
 
 ### Batch Rendering
 

@@ -1,6 +1,6 @@
 # Admin Dashboard
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 27, 2026
 **URL:** https://woodhouse-creative.vercel.app/admin
 **Local:** http://localhost:3000/admin
 
@@ -8,44 +8,59 @@
 
 ## Overview
 
-The admin dashboard provides tools for managing dealer automation, batch rendering, email sending, and spreadsheet operations.
+The admin dashboard provides tools for managing dealer automation, batch rendering, email sending, post creation, and spreadsheet operations. It is organized into 6 pages by workflow area.
 
 ---
 
 ## Dashboard Pages
 
-### `/admin` - Main Dashboard
+### `/admin` - Overview & Sync
 
 **Features:**
 
 | Section | Purpose |
 |---------|---------|
 | **Quick Stats** | Dealer counts, post counts, ready status |
-| **Excel Sync** | Preview/apply changes from Allied Excel (LOCAL ONLY) |
-| **Batch Render** | Submit post number + template for video rendering |
-| **Populate Post Copy** | Enter base copy, populate to all dealers |
-| **Process Done Emails** | Send emails to dealers marked "Done" |
+| **Excel Sync** | Preview/apply changes from Allied Excel (Microsoft Graph API) |
+| **Navigation** | Cards linking to all other admin pages |
 
-**Excel Sync Limitation:**
-Only works on localhost. Requires Python + WSL OneDrive access to read Allied Excel file.
+**Excel Sync:** Works on both localhost and Vercel via Microsoft Graph API with OAuth2 device code flow.
 
 ---
 
-### `/admin/posts` - Post Workflow
+### `/admin/posts` - Post Management
 
 **Features:**
-- View post archive (656+ posts)
-- Create/submit new posts with metadata
-- View scheduling spreadsheet status
-- Filter by season, subject matter
+- View existing posts with search/filter and video thumbnails from Google Drive
+- Create new posts with one-click workflow (select template, enter copy, auto-renders for all FULL dealers)
+- Generate PDF copy deck for CONTENT dealers with video thumbnails (Cloudinary)
 
-**Post Fields:**
-- Post number
-- Base copy (with {name}, {phone}, {website} placeholders)
-- Season (Fall, Winter, Spring, Summer)
-- Subject matter
-- Tags
-- Approval status
+**Create Post Workflow:**
+1. Select Creatomate template from dropdown
+2. Enter post number and base copy with variable placeholders
+3. One-click: creates post, adds to spreadsheet, populates personalized copy, triggers batch renders
+
+---
+
+### `/admin/scheduling` - FULL Dealer Operations
+
+**Features:**
+
+| Section | Purpose |
+|---------|---------|
+| **Dealer Status Table** | View all FULL dealers from scheduling spreadsheet with sorting |
+| **Process Done Emails** | Send emails to dealers marked "Done" (auto-detects first_post vs post_scheduled) |
+| **Batch Video Render** | Submit post number + template for batch rendering |
+| **Populate Post Copy** | Enter base copy with variable picker, populate to all dealer columns |
+| **Email Delivery Status** | Track delivered/opened/clicked/bounced status via Resend webhooks |
+
+---
+
+### `/admin/content-dealers` - CONTENT Dealer Operations
+
+**Features:**
+- Populate mail merge spreadsheet with CONTENT/NEW dealers from Firestore
+- Manage welcome email automation workflow for non-FULL dealers
 
 ---
 
@@ -90,6 +105,7 @@ After approval, the system automatically:
 | Post Scheduled | `post_scheduled.html` | Ongoing notifications |
 | Content Ready | `content_ready.html` | Monthly content for CONTENT dealers |
 | Holiday | `holiday.html` | Seasonal campaigns |
+| Onboarding Complete | `onboarding_complete.html` | After dealer onboarding finalized |
 
 **Template Variables:**
 - `{{first_name}}` - Contact first name
@@ -109,9 +125,17 @@ After approval, the system automatically:
 5. Click "Approve"
 6. System handles spreadsheet, renders, emails
 
+### Create a New Post
+
+1. Navigate to `/admin/posts`
+2. Select Creatomate template
+3. Enter post number and base copy
+4. Click "Create Post"
+5. System creates post, populates copy, triggers batch renders
+
 ### Send Batch Render
 
-1. Navigate to `/admin`
+1. Navigate to `/admin/scheduling`
 2. Enter post number
 3. Enter Creatomate template ID
 4. Click "Start Batch"
@@ -119,7 +143,7 @@ After approval, the system automatically:
 
 ### Process "Done" Dealers
 
-1. Navigate to `/admin`
+1. Navigate to `/admin/scheduling`
 2. View "Process Done Emails" section
 3. Review dealers marked "Done" in spreadsheet
 4. Click "Send" for individual or "Process All"
@@ -127,12 +151,18 @@ After approval, the system automatically:
 
 ### Populate Post Copy
 
-1. Navigate to `/admin`
+1. Navigate to `/admin/scheduling`
 2. Enter post number
 3. Type base copy in text area
 4. Click variable buttons: {name}, {phone}, {website}
 5. Click "Preview" to verify
 6. Click "Populate All" to write to spreadsheet
+
+### Generate Copy Deck PDF
+
+1. Navigate to `/admin/posts`
+2. Click "Generate Copy Deck"
+3. PDF includes video thumbnails (Cloudinary) and personalized copy per dealer
 
 ---
 
