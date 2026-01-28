@@ -44,6 +44,43 @@ ga        # git add .
 
 ---
 
+## Docs-Only Commits (Skip Builds)
+
+For documentation, README, or comment-only changes, use `[skip]` marker to prevent Vercel from running a build:
+
+```bash
+# Commit with [skip] marker
+git commit -m "[skip] docs: Update TECH_DEBT.md with new section
+
+Added documentation for consolidating shared scripts."
+
+# Or at the end
+git commit -m "docs: Update TECH_DEBT.md
+
+[skip]"
+
+# Then push normally
+gpush
+# → File is pushed to main/production but Vercel skips build
+```
+
+**What [skip] does:**
+- Files still pushed to repo (tracked in git)
+- Vercel detects `[skip]` in commit message
+- Skips build pipeline entirely
+- No deployment triggered
+- Changes are visible in repo but don't go live immediately
+- Perfect for: docs, READMEs, CHANGELOG, comments, architecture decision records
+
+**When to use:**
+- Updating documentation files
+- Adding/updating TECH_DEBT.md, CHANGELOG.md
+- Fixing typos in code comments
+- ADRs and design docs
+- Any commit that doesn't affect runtime code
+
+---
+
 ## Query Firestore
 
 **IMPORTANT:** Use `npx tsx` with library imports, NOT standalone scripts.
