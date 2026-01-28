@@ -113,12 +113,13 @@ function readPlanText(filePath) {
  * Get the active plan for this repo
  *
  * Logic:
- * 1. If pointer exists and points to valid file → use it
- * 2. If no pointer or invalid → bootstrap from newest plan file
- * 3. Check if a newer plan file appeared → auto-switch
- * 4. Check if pointer is stale (>24h) → warn but don't auto-switch
+ * 1. If pointer exists and points to valid file → use it (NEVER auto-switch)
+ * 2. If pointer points to deleted file → bootstrap from newest
+ * 3. If no pointer exists → bootstrap from newest plan file
+ * 4. Warn if newer plan file exists (but don't switch)
+ * 5. Staleness based on plan file mtime, not pointer age
  *
- * Returns: { file, title, text, hash, isStale, newerPlanExists, switched }
+ * Returns: { file, title, text, hash, isStale, newerPlanExists, bootstrapped }
  */
 async function getActivePlan() {
   const planFiles = getPlanFiles();
@@ -129,31 +130,19 @@ async function getActivePlan() {
 
   const newestFile = planFiles[0];
   let pointer = readPointer();
-  let switched = false;
+  let bootstrapped = false;
 
-  // Check if pointer is valid
+  // If pointer exists and file is valid → keep it (no auto-switch)
   if (pointer && pointer.plan_file) {
-    const pointerFileExists = fs.existsSync(pointer.plan_file);
-
-    if (!pointerFileExists) {
-      // Pointer points to deleted file → switch to newest
+    if (!fs.existsSync(pointer.plan_file)) {
+      // Pointer points to deleted file → bootstrap from newest
       pointer = null;
-      switched = true;
-    } else {
-      // Check if a NEWER file appeared (new plan created)
-      const pointerMtime = fs.statSync(pointer.plan_file).mtimeMs;
-      const lastSeenMtime = pointer.last_seen_mtime || 0;
-
-      // If newest file is different from pointer AND newer than last seen
-      if (newestFile.path !== pointer.plan_file && newestFile.mtimeMs > lastSeenMtime) {
-        // New plan file appeared → auto-switch
-        pointer = null;
-        switched = true;
-      }
+      bootstrapped = true;
     }
+    // Otherwise: keep current pointer, even if newer files exist
   }
 
-  // Bootstrap pointer if needed
+  // Bootstrap pointer if needed (first time or deleted file)
   if (!pointer) {
     const text = readPlanText(newestFile.path);
     const title = extractTitle(text, newestFile.name);
@@ -162,11 +151,11 @@ async function getActivePlan() {
       repo: path.basename(process.cwd()),
       plan_file: newestFile.path,
       plan_title: title,
-      last_seen_mtime: newestFile.mtimeMs,
       updated_at: new Date().toISOString()
     };
 
     writePointer(pointer);
+    bootstrapped = true;
   }
 
   // Read the active plan
@@ -177,18 +166,16 @@ async function getActivePlan() {
 
   const hash = hashPlan(text);
   const title = extractTitle(text, path.basename(pointer.plan_file));
+  const planFileMtime = fs.statSync(pointer.plan_file).mtimeMs;
 
-  // Update pointer with current mtime (tracks when plan was last modified)
-  const currentMtime = fs.statSync(pointer.plan_file).mtimeMs;
-  pointer.last_seen_mtime = Math.max(currentMtime, newestFile.mtimeMs);
+  // Update pointer title (in case plan heading changed)
   pointer.plan_title = title;
   writePointer(pointer);
 
-  // Check staleness
-  const pointerAge = Date.now() - new Date(pointer.updated_at).getTime();
-  const isStale = pointerAge > STALE_THRESHOLD_MS;
+  // Staleness based on plan FILE mtime (not pointer age)
+  const isStale = (Date.now() - planFileMtime) > STALE_THRESHOLD_MS;
 
-  // Check if newer plan exists (for warning)
+  // Check if newer plan exists (warning only, no switch)
   const newerPlanExists = newestFile.path !== pointer.plan_file;
 
   return {
@@ -198,16 +185,13 @@ async function getActivePlan() {
     hash,
     isStale,
     newerPlanExists,
-    switched,
+    bootstrapped,
     newerPlanFile: newerPlanExists ? newestFile.path : null
   };
 }
 
 /**
  * Manually set the active plan (for explicit switches)
- *
- * IMPORTANT: Sets last_seen_mtime to MAX of all plan files' mtimes.
- * This prevents auto-switch back to a "newer" file from another repo.
  */
 function setActivePlan(planFilePath) {
   if (!fs.existsSync(planFilePath)) {
@@ -217,17 +201,10 @@ function setActivePlan(planFilePath) {
   const text = readPlanText(planFilePath);
   const title = extractTitle(text, path.basename(planFilePath));
 
-  // Get the max mtime of ALL plan files to prevent auto-switch
-  const allFiles = getPlanFiles();
-  const maxMtime = allFiles.length > 0
-    ? Math.max(...allFiles.map(f => f.mtimeMs))
-    : fs.statSync(planFilePath).mtimeMs;
-
   const pointer = {
     repo: path.basename(process.cwd()),
     plan_file: planFilePath,
     plan_title: title,
-    last_seen_mtime: maxMtime, // Use max of all files, not just this one
     updated_at: new Date().toISOString()
   };
 
@@ -276,8 +253,8 @@ if (require.main === module) {
         if (plan.newerPlanExists) {
           console.log(`⚠️  Newer plan exists: ${plan.newerPlanFile}`);
         }
-        if (plan.switched) {
-          console.log('ℹ️  Auto-switched to this plan (new file detected)');
+        if (plan.bootstrapped) {
+          console.log('Bootstrapped from newest plan file');
         }
       }
     });
