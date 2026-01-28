@@ -158,10 +158,13 @@ async function saveCheckpoint() {
       const lastHash = await getLastPlanHash();
       planChanged = activePlan.hash !== lastHash;
 
-      // Log plan detection
+      // SAFEGUARD: If auto-switched, DON'T write to repo_state
+      // This prevents cross-repo pollution (plan files are global, repo_state is per-repo)
       if (activePlan.switched) {
-        logToSessionLog(`Plan auto-switched to: ${activePlan.title}`);
+        logToSessionLog(`⚠️ Plan auto-switched to: ${activePlan.title}. Skipping repo_state update to prevent cross-repo pollution.`);
+        planChanged = false; // Don't write to repo_state until manually confirmed
       }
+
       if (activePlan.isStale && activePlan.newerPlanExists) {
         logToSessionLog(`⚠️ Plan pointer stale (>24h). Newer plan exists: ${activePlan.newerPlanFile}`);
       }

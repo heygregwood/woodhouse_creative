@@ -205,6 +205,9 @@ async function getActivePlan() {
 
 /**
  * Manually set the active plan (for explicit switches)
+ *
+ * IMPORTANT: Sets last_seen_mtime to MAX of all plan files' mtimes.
+ * This prevents auto-switch back to a "newer" file from another repo.
  */
 function setActivePlan(planFilePath) {
   if (!fs.existsSync(planFilePath)) {
@@ -213,13 +216,18 @@ function setActivePlan(planFilePath) {
 
   const text = readPlanText(planFilePath);
   const title = extractTitle(text, path.basename(planFilePath));
-  const stats = fs.statSync(planFilePath);
+
+  // Get the max mtime of ALL plan files to prevent auto-switch
+  const allFiles = getPlanFiles();
+  const maxMtime = allFiles.length > 0
+    ? Math.max(...allFiles.map(f => f.mtimeMs))
+    : fs.statSync(planFilePath).mtimeMs;
 
   const pointer = {
     repo: path.basename(process.cwd()),
     plan_file: planFilePath,
     plan_title: title,
-    last_seen_mtime: stats.mtimeMs,
+    last_seen_mtime: maxMtime, // Use max of all files, not just this one
     updated_at: new Date().toISOString()
   };
 
