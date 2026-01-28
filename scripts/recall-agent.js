@@ -3,7 +3,7 @@
  *
  * Usage:
  *   node scripts/recall-agent.js                    # SessionStart mode (recent + topics)
- *   node scripts/recall-agent.js "batch render"     # Query mode (semantic search)
+ *   node scripts/recall-agent.js "admin dashboard"  # Query mode (semantic search)
  *
  * SessionStart mode:
  *   - Returns last 3 session summaries
@@ -14,13 +14,17 @@
  *   - Calls Claude Haiku to find semantically relevant sessions
  *   - Synthesizes context across multiple sessions
  *   - Returns decisions, blockers, files for the topic
- *
- * Reads from claude-context-gregw (dedicated context DB shared across repos).
- * Filters by repo='woodhouse_creative' for SessionStart mode.
  */
 
+// Use override: true so .env.local values take precedence over
+// Claude Code's process env (which sets ANTHROPIC_API_KEY="" empty string)
 require('dotenv').config({ path: '.env.local', override: true });
+const path = require('path');
 const admin = require('firebase-admin');
+const Anthropic = require('@anthropic-ai/sdk').default;
+
+// Detect current repo from directory name
+const CURRENT_REPO = path.basename(process.cwd());
 
 // Initialize Firebase Admin - connects to claude-context-gregw (dedicated context DB)
 if (!admin.apps.length) {
@@ -35,29 +39,31 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
 /**
  * Fetch sessions from Firestore (last 6 months)
- * In SessionStart mode, filters to this repo only.
- * In Query mode, searches across all repos.
  */
-async function fetchSessions(repoFilter) {
+async function fetchSessions() {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  let query = db
+  const snapshot = await db
     .collection('claude_sessions')
     .where('created_at', '>=', admin.firestore.Timestamp.fromDate(sixMonthsAgo))
     .orderBy('created_at', 'desc')
-    .limit(500);
+    .limit(500)
+    .get();
 
-  const snapshot = await query.get();
-
-  let sessions = snapshot.docs.map((doc) => {
+  return snapshot.docs.map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,
-      repo: data.repo || 'unknown',
       created_at: data.created_at?.toDate?.() || new Date(),
+      repo: data.repo || 'unknown',
       summary: data.summary || '',
       topics: data.topics || [],
       decisions: data.decisions || [],
@@ -68,13 +74,6 @@ async function fetchSessions(repoFilter) {
       user_request: data.user_request || null,
     };
   });
-
-  // Filter by repo if specified (SessionStart mode)
-  if (repoFilter) {
-    sessions = sessions.filter((s) => s.repo === repoFilter);
-  }
-
-  return sessions;
 }
 
 /**
@@ -87,13 +86,28 @@ function formatDate(date) {
 /**
  * SessionStart mode - return recent sessions and topic index
  */
-async function sessionStartMode(sessions) {
-  // Get last 3 sessions
-  const recentSessions = sessions.slice(0, 3);
+/**
+ * Short repo label for display
+ */
+function repoLabel(repo) {
+  if (repo === 'woodhouse_social') return 'social';
+  if (repo === 'woodhouse_creative') return 'creative';
+  return repo;
+}
 
-  // Build topic index (topic -> dates)
+async function sessionStartMode(sessions) {
+  // Split sessions by repo
+  const currentRepoSessions = sessions.filter((s) => s.repo === CURRENT_REPO);
+  const otherRepoSessions = sessions.filter((s) => s.repo !== CURRENT_REPO);
+
+  // Get last 3 from current repo
+  const recentCurrent = currentRepoSessions.slice(0, 3);
+  // Get last 2 from other repos for cross-repo awareness
+  const recentOther = otherRepoSessions.slice(0, 2);
+
+  // Build topic index (topic -> dates) from current repo only
   const topicIndex = {};
-  sessions.forEach((session) => {
+  currentRepoSessions.forEach((session) => {
     const dateStr = formatDate(session.created_at);
     session.topics.forEach((topic) => {
       if (!topicIndex[topic]) {
@@ -110,9 +124,9 @@ async function sessionStartMode(sessions) {
     return new Date(b[1][0]) - new Date(a[1][0]);
   });
 
-  // Collect active blockers
+  // Collect active blockers from current repo
   const activeBlockers = [];
-  sessions.slice(0, 10).forEach((session) => {
+  currentRepoSessions.slice(0, 10).forEach((session) => {
     if (session.outcome !== 'completed' && session.blockers.length > 0) {
       session.blockers.forEach((blocker) => {
         if (!activeBlockers.includes(blocker)) {
@@ -123,15 +137,29 @@ async function sessionStartMode(sessions) {
   });
 
   // Output formatted markdown
-  console.log('# Session Context\n');
+  console.log(`# Session Context (${CURRENT_REPO})\n`);
 
   console.log('## Recent Work');
-  recentSessions.forEach((session) => {
-    const date = formatDate(session.created_at);
-    const outcome = session.outcome === 'completed' ? 'completed' : session.outcome;
-    console.log(`- [${date}] ${session.summary.substring(0, 80)} - ${outcome}`);
-  });
+  if (recentCurrent.length > 0) {
+    recentCurrent.forEach((session) => {
+      const date = formatDate(session.created_at);
+      const outcome = session.outcome === 'completed' ? 'completed' : session.outcome;
+      console.log(`- [${date}] ${session.summary.substring(0, 80)} - ${outcome}`);
+    });
+  } else {
+    console.log('- No recent sessions for this repo.');
+  }
   console.log('');
+
+  if (recentOther.length > 0) {
+    console.log('## Recent from Other Repos');
+    recentOther.forEach((session) => {
+      const date = formatDate(session.created_at);
+      const label = repoLabel(session.repo);
+      console.log(`- [${date}] [${label}] ${session.summary.substring(0, 70)} - ${session.outcome}`);
+    });
+    console.log('');
+  }
 
   if (sortedTopics.length > 0) {
     console.log('## Topics with History');
@@ -156,31 +184,11 @@ async function sessionStartMode(sessions) {
  * Query mode - use Haiku to find relevant sessions
  */
 async function queryMode(sessions, query) {
-  // Check if Anthropic SDK is available
-  let anthropic;
-  try {
-    const Anthropic = require('@anthropic-ai/sdk').default;
-    anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-  } catch (e) {
-    // Anthropic SDK not installed - use fallback
-    console.log(`# Recall: "${query}" (fallback mode - install @anthropic-ai/sdk for semantic search)\n`);
-    fallbackSearch(sessions, query);
-    return;
-  }
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log(`# Recall: "${query}" (fallback mode - ANTHROPIC_API_KEY not set)\n`);
-    fallbackSearch(sessions, query);
-    return;
-  }
-
   // Prepare session summaries for Haiku
   const sessionSummaries = sessions.map((s) => ({
     id: s.id,
-    repo: s.repo,
     date: formatDate(s.created_at),
+    repo: s.repo,
     summary: s.summary,
     topics: s.topics,
     decisions: s.decisions,
@@ -189,7 +197,9 @@ async function queryMode(sessions, query) {
     outcome: s.outcome,
   }));
 
-  const systemPrompt = `You are a recall agent for a software development project (woodhouse_creative - Allied Air dealer automation). Your job is to find sessions relevant to the user's query and synthesize the context.
+  const systemPrompt = `You are a recall agent for a software development project. Your job is to find sessions relevant to the user's query and synthesize the context.
+
+Sessions come from multiple repos (woodhouse_social = SaaS product, woodhouse_creative = Allied Air agency ops). Each session has a "repo" field. The current repo is "${CURRENT_REPO}". Prioritize sessions from the current repo but include cross-repo sessions if relevant.
 
 Given a list of session summaries and a query, you must:
 1. Identify sessions that are semantically relevant (not just keyword matching)
@@ -198,7 +208,7 @@ Given a list of session summaries and a query, you must:
 
 Output format (use exactly this structure):
 ## Relevant Sessions
-[List the 1-5 most relevant sessions by date and summary]
+[List the 1-5 most relevant sessions by date, repo, and summary]
 
 ## Summary
 [2-3 sentence synthesis of work done on this topic]
@@ -236,27 +246,19 @@ Find sessions relevant to this query and synthesize the context.`;
     console.error(`Error calling Haiku: ${error.message}`);
     // Fallback to simple search
     console.log(`# Recall: "${query}" (fallback mode)\n`);
-    fallbackSearch(sessions, query);
-  }
-}
-
-/**
- * Simple keyword-based search fallback
- */
-function fallbackSearch(sessions, query) {
-  const relevant = sessions.filter(
-    (s) =>
-      s.summary.toLowerCase().includes(query.toLowerCase()) ||
-      s.topics.some((t) => t.toLowerCase().includes(query.toLowerCase()))
-  );
-  if (relevant.length > 0) {
-    console.log('## Matching Sessions');
-    relevant.slice(0, 5).forEach((s) => {
-      const repoTag = s.repo !== 'woodhouse_creative' ? ` [${s.repo}]` : '';
-      console.log(`- [${formatDate(s.created_at)}]${repoTag} ${s.summary}`);
-    });
-  } else {
-    console.log('No matching sessions found.');
+    const relevant = sessions.filter(
+      (s) =>
+        s.summary.toLowerCase().includes(query.toLowerCase()) ||
+        s.topics.some((t) => t.toLowerCase().includes(query.toLowerCase()))
+    );
+    if (relevant.length > 0) {
+      console.log('## Matching Sessions');
+      relevant.slice(0, 5).forEach((s) => {
+        console.log(`- [${formatDate(s.created_at)}] ${s.summary}`);
+      });
+    } else {
+      console.log('No matching sessions found.');
+    }
   }
 }
 
@@ -266,27 +268,20 @@ function fallbackSearch(sessions, query) {
 async function main() {
   const query = process.argv[2];
 
+  // Fetch sessions
+  const sessions = await fetchSessions();
+
+  if (sessions.length === 0) {
+    console.log('# Session Context\n');
+    console.log('No previous sessions found. This appears to be a fresh start.');
+    return;
+  }
+
   if (query) {
-    // Query mode - search across ALL repos for broader context
-    const sessions = await fetchSessions(null);
-
-    if (sessions.length === 0) {
-      console.log('# Session Context\n');
-      console.log('No previous sessions found.');
-      return;
-    }
-
+    // Query mode - semantic search with Haiku
     await queryMode(sessions, query);
   } else {
-    // SessionStart mode - filter to this repo only
-    const sessions = await fetchSessions('woodhouse_creative');
-
-    if (sessions.length === 0) {
-      console.log('# Session Context\n');
-      console.log('No previous sessions found. This appears to be a fresh start.');
-      return;
-    }
-
+    // SessionStart mode - recent + topic index
     await sessionStartMode(sessions);
   }
 }

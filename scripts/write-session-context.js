@@ -11,11 +11,27 @@
  * Accepts JSON via file argument (most reliable) OR stdin pipe.
  * DO NOT prefix with "set -a && source .env.local" — dotenv loads it internally.
  *
- * Writes to claude-context-gregw (dedicated context DB shared across repos).
+ * Schema:
+ *   - summary (REQUIRED): What was accomplished
+ *   - topics[]: Dynamic topics extracted from conversation
+ *   - decisions[]: Key decisions made
+ *   - blockers[]: Issues preventing progress
+ *   - entities[]: Named things (Allied, Stripe, specific components)
+ *   - files_touched[]: Files modified
+ *   - outcome: completed | in_progress | blocked | abandoned
+ *   - user_request: Original ask that started the work
+ *   - commits[]: Git SHAs for this work
+ *   - session_boundary: true if saved at compact/session end
+ *   - trigger: task_complete | decision | blocker | topic_switch | pre_compact | periodic
+ *   - important_context: Flexible key/value pairs
  */
 
-require('dotenv').config({ path: '.env.local', override: true });
+require('dotenv').config({ path: '.env.local' });
+const path = require('path');
 const admin = require('firebase-admin');
+
+// Detect current repo from directory name
+const CURRENT_REPO = path.basename(process.cwd());
 
 // Initialize Firebase Admin - connects to claude-context-gregw (dedicated context DB)
 if (!admin.apps.length) {
@@ -81,12 +97,12 @@ async function writeSessionContext() {
     process.exit(1);
   }
 
-  // Build the document
+  // Build the document with new schema
   const sessionDoc = {
     // Metadata
     created_at: admin.firestore.FieldValue.serverTimestamp(),
     machine: process.env.COMPUTERNAME || process.env.HOSTNAME || 'unknown',
-    repo: 'woodhouse_creative',
+    repo: CURRENT_REPO,
     trigger: context.trigger || 'periodic',
 
     // Core context (REQUIRED)
