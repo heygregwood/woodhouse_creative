@@ -31,3 +31,6 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 .env*.local
+
+# Claude Code session management (machine-local)
+.claude/active-plan.json

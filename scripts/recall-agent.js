@@ -6,14 +6,19 @@
  *   node scripts/recall-agent.js "admin dashboard"  # Query mode (semantic search)
  *
  * SessionStart mode:
+ *   - Shows active plan from repo_state (verbatim)
  *   - Returns last 3 session summaries
  *   - Lists all topics with dates
  *   - Shows active blockers
  *
  * Query mode:
+ *   - Fetches active plan from repo_state (printed verbatim)
  *   - Calls Claude Haiku to find semantically relevant sessions
  *   - Synthesizes context across multiple sessions
  *   - Returns decisions, blockers, files for the topic
+ *
+ * NEW: Plans are read from claude_repo_state/{repo} and printed verbatim.
+ *      Haiku only summarizes sessions/decisions - it doesn't reproduce plans.
  */
 
 // Use override: true so .env.local values take precedence over
@@ -45,6 +50,28 @@ const anthropic = new Anthropic({
 });
 
 /**
+ * Fetch the canonical repo state (active plan)
+ */
+async function fetchRepoState(repo) {
+  try {
+    const doc = await db.collection('claude_repo_state').doc(repo).get();
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        title: data.active_plan_title,
+        text: data.active_plan_text,
+        hash: data.active_plan_hash,
+        file: data.active_plan_file,
+        updated_at: data.updated_at?.toDate?.() || null,
+      };
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return null;
+}
+
+/**
  * Fetch sessions from Firestore (last 6 months)
  */
 async function fetchSessions() {
@@ -72,8 +99,8 @@ async function fetchSessions() {
       files_touched: data.files_touched || [],
       outcome: data.outcome || 'unknown',
       user_request: data.user_request || null,
-      plan: data.plan || null,
       plan_status: data.plan_status || null,
+      // Note: we don't fetch plan text from sessions anymore - use repo_state instead
     };
   });
 }
@@ -86,9 +113,6 @@ function formatDate(date) {
 }
 
 /**
- * SessionStart mode - return recent sessions and topic index
- */
-/**
  * Short repo label for display
  */
 function repoLabel(repo) {
@@ -97,7 +121,25 @@ function repoLabel(repo) {
   return repo;
 }
 
-async function sessionStartMode(sessions) {
+/**
+ * Print the active plan (verbatim from repo_state)
+ */
+function printActivePlan(repoState) {
+  if (!repoState || !repoState.text) {
+    return;
+  }
+
+  console.log('## Active Plan\n');
+  console.log(`**${repoState.title}**`);
+  console.log(`*(${repoState.text.length} chars, updated ${formatDate(repoState.updated_at)})*\n`);
+  console.log(repoState.text);
+  console.log('');
+}
+
+/**
+ * SessionStart mode - return recent sessions and topic index
+ */
+async function sessionStartMode(sessions, repoState) {
   // Split sessions by repo
   const currentRepoSessions = sessions.filter((s) => s.repo === CURRENT_REPO);
   const otherRepoSessions = sessions.filter((s) => s.repo !== CURRENT_REPO);
@@ -184,9 +226,10 @@ async function sessionStartMode(sessions) {
 
 /**
  * Query mode - use Haiku to find relevant sessions
+ * Plan is printed verbatim from repo_state - Haiku only summarizes sessions
  */
-async function queryMode(sessions, query) {
-  // Prepare session summaries for Haiku
+async function queryMode(sessions, query, repoState) {
+  // Prepare session summaries for Haiku (WITHOUT full plan text - too large)
   const sessionSummaries = sessions.map((s) => ({
     id: s.id,
     date: formatDate(s.created_at),
@@ -197,10 +240,12 @@ async function queryMode(sessions, query) {
     blockers: s.blockers,
     files: s.files_touched,
     outcome: s.outcome,
-    ...(s.plan && { plan: s.plan }),
+    // Include plan_status but NOT full plan text
     ...(s.plan_status && { plan_status: s.plan_status }),
   }));
 
+  // Haiku's job: find relevant sessions, summarize decisions/blockers
+  // NOT: reproduce plans (we do that ourselves from repo_state)
   const systemPrompt = `You are a recall agent for a software development project. Your job is to find sessions relevant to the user's query and synthesize the context.
 
 Sessions come from multiple repos (woodhouse_social = SaaS product, woodhouse_creative = Allied Air agency ops). Each session has a "repo" field. The current repo is "${CURRENT_REPO}". Prioritize sessions from the current repo but include cross-repo sessions if relevant.
@@ -209,7 +254,8 @@ Given a list of session summaries and a query, you must:
 1. Identify sessions that are semantically relevant (not just keyword matching)
 2. Synthesize information across sessions
 3. Return a clear summary of what was done, decisions made, and any blockers
-4. If any relevant session has a 'plan' field, include the FULL plan text — plans are high-value context that must be preserved verbatim
+
+IMPORTANT: Do NOT include an "Active Plan" section. The plan is handled separately and printed verbatim by the system.
 
 Output format (use exactly this structure):
 ## Relevant Sessions
@@ -227,11 +273,6 @@ Output format (use exactly this structure):
 ## Files Involved
 [Bullet list of files touched, or "None recorded" if empty]
 
-## Active Plan
-[If any relevant session has a plan field, include the full plan text here with its plan_status. If no plan exists, omit this section entirely.]
-
-EXCEPTION: Always include the full plan text if one exists — never summarize or truncate plans.
-
 Be concise. Only include information that's relevant to the query.`;
 
   const userMessage = `Query: "${query}"
@@ -241,28 +282,33 @@ ${JSON.stringify(sessionSummaries, null, 2)}
 
 Find sessions relevant to this query and synthesize the context.`;
 
+  console.log(`# Recall: "${query}"\n`);
+
+  // Print active plan FIRST (verbatim from repo_state)
+  if (repoState && repoState.text) {
+    printActivePlan(repoState);
+  }
+
   try {
     const response = await anthropic.messages.create({
       model: 'claude-3-haiku-20240307',
-      max_tokens: 1024,
+      max_tokens: 2048, // Increased from 1024 for better summaries
       messages: [{ role: 'user', content: userMessage }],
       system: systemPrompt,
     });
 
     const result = response.content[0].text;
-    console.log(`# Recall: "${query}"\n`);
     console.log(result);
   } catch (error) {
     console.error(`Error calling Haiku: ${error.message}`);
     // Fallback to simple search
-    console.log(`# Recall: "${query}" (fallback mode)\n`);
+    console.log('## Matching Sessions (fallback mode)\n');
     const relevant = sessions.filter(
       (s) =>
         s.summary.toLowerCase().includes(query.toLowerCase()) ||
         s.topics.some((t) => t.toLowerCase().includes(query.toLowerCase()))
     );
     if (relevant.length > 0) {
-      console.log('## Matching Sessions');
       relevant.slice(0, 5).forEach((s) => {
         console.log(`- [${formatDate(s.created_at)}] ${s.summary}`);
       });
@@ -278,10 +324,13 @@ Find sessions relevant to this query and synthesize the context.`;
 async function main() {
   const query = process.argv[2];
 
+  // Fetch repo state (active plan) first
+  const repoState = await fetchRepoState(CURRENT_REPO);
+
   // Fetch sessions
   const sessions = await fetchSessions();
 
-  if (sessions.length === 0) {
+  if (sessions.length === 0 && !repoState) {
     console.log('# Session Context\n');
     console.log('No previous sessions found. This appears to be a fresh start.');
     return;
@@ -289,10 +338,10 @@ async function main() {
 
   if (query) {
     // Query mode - semantic search with Haiku
-    await queryMode(sessions, query);
+    await queryMode(sessions, query, repoState);
   } else {
     // SessionStart mode - recent + topic index
-    await sessionStartMode(sessions);
+    await sessionStartMode(sessions, repoState);
   }
 }
 
