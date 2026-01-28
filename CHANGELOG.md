@@ -6,6 +6,91 @@ All notable changes to Woodhouse Creative are documented here.
 
 ---
 
+## [2026-01-28] - Add Checkpoint Buffer System for Session Persistence
+
+### Added
+- **Checkpoint buffer system** — `.claude-checkpoint.json` file persists between auto-compactions
+  - PreCompact hook reads checkpoint and saves to Firestore automatically
+  - No race condition between manual saves and auto-compaction
+  - Survives across machines (tracked in git, pulled on laptop/desktop)
+  - Light validation on save (required fields, type checks)
+  - Graceful error handling (skip + log, never breaks PreCompact hook)
+
+- **scripts/save-checkpoint.js** — New script for checkpoint persistence
+  - Reads `.claude-checkpoint.json` from project root
+  - Validates required fields: summary, topics, user_request
+  - Validates optional fields: plan, plan_status, decisions, blockers, entities, files_touched
+  - Writes to Firestore `claude_sessions` collection with trigger=pre_compact
+  - Dynamic repo detection (`woodhouse_social` or `woodhouse_creative`)
+  - Logs results to `docs/archive/sessions/session_log.txt`
+
+- **Plan persistence fields** — session context now survives plans across compactions
+  - `plan` field stores full plan text (numbered steps, descriptions, constraints)
+  - `plan_status` field tracks progress (e.g., "step 6 of 13 complete")
+  - New `plan_created` trigger for explicit plan save events
+  - Both tools (`write-session-context.js` and `recall-agent.js`) support plan fields
+  - Recall agent returns plans verbatim in new "## Active Plan" section
+
+- **Cross-repo synchronization** — shared Firestore `claude_sessions` collection
+  - Both repos read/write to same collection with repo field
+  - SessionStart hook loads context from either repo
+  - Checkpoint file tracked in git for machine-to-machine sync
+
+### Changed
+- **scripts/write-session-context.js** — updated schema and field handling
+  - Added `plan_created` to trigger enum
+  - Added `plan` and `plan_status` fields (written only if present)
+  - Uses conditional spread operators to avoid empty values
+
+- **scripts/recall-agent.js** — enhanced to surface plans
+  - Fetch plan/plan_status from Firestore
+  - Pass plan fields to Haiku in session summaries
+  - Updated system prompt to preserve full plan text (never truncate)
+  - Added "## Active Plan" section to output (only if plan exists)
+  - Exception rule: always include full plan text if present
+
+- **CLAUDE.md** — comprehensive checkpoint documentation
+  - New "Checkpoint Buffer System" section (150+ lines)
+    - Problem/solution explanation
+    - When to write checkpoints (every 5-10 minutes)
+    - Checkpoint schema with required/optional fields
+    - How it works (flow diagram)
+    - Setup instructions for `.claude/settings.local.json`
+  - New "Plan Persistence (MANDATORY)" section (80+ lines)
+    - Rule: save plans on creation, not completion
+    - Examples for plan mode and emergent todos
+    - Timing guidance: save immediately before work begins
+  - Updated Session Context schema with plan fields
+  - Updated Save Triggers with `plan_created` trigger
+
+- **PreCompact hook** — now saves checkpoint to Firestore
+  - Changed from simple timestamp logging to full checkpoint persistence
+  - Hook command: `node scripts/save-checkpoint.js --trigger=pre_compact`
+  - Setup in `.claude/settings.local.json`
+
+### Files Changed
+- `scripts/write-session-context.js` — added plan fields to schema and document builder
+- `scripts/recall-agent.js` — added plan fetch and display
+- `scripts/save-checkpoint.js` — **new file**
+- `CLAUDE.md` — added checkpoint buffer and plan persistence sections
+- `.claude-checkpoint.json` — **new file** (template)
+- `docs/archive/sessions/session_log.txt` — now includes checkpoint save records
+
+### Testing
+- ✅ Created test checkpoint with plan
+- ✅ Ran `save-checkpoint.js --trigger=pre_compact`
+- ✅ Verified checkpoint saved to Firestore (doc: viNNVjDm1eu8toT0pKWb)
+- ✅ Verified session log recorded save
+- ✅ Verified recall agent retrieves checkpoint
+- ✅ Verified Active Plan section displays full plan verbatim
+
+### Related Repos
+- Same system implemented in `woodhouse_social` (Jan 28, 2026)
+- Shared Firestore collection enables cross-repo session recall
+- Cross-machine sync via git-tracked `.claude-checkpoint.json`
+
+---
+
 ## [2026-01-27] - Add Manage Existing Dealers to Dealer Review Page
 
 ### Added

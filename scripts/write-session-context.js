@@ -22,7 +22,9 @@
  *   - user_request: Original ask that started the work
  *   - commits[]: Git SHAs for this work
  *   - session_boundary: true if saved at compact/session end
- *   - trigger: task_complete | decision | blocker | topic_switch | pre_compact | periodic
+ *   - trigger: task_complete | decision | blocker | topic_switch | pre_compact | periodic | plan_created
+ *   - plan: Full plan text (when trigger is plan_created or plan is active)
+ *   - plan_status: e.g. "step 6 of 13 complete" (tracks progress through a plan)
  *   - important_context: Flexible key/value pairs
  */
 
@@ -120,6 +122,10 @@ async function writeSessionContext() {
     user_request: context.user_request || null,
     commits: context.commits || [],
     session_boundary: context.session_boundary || false,
+
+    // Plan persistence (survives compaction)
+    ...(context.plan && { plan: context.plan }),
+    ...(context.plan_status && { plan_status: context.plan_status }),
 
     // Flexible additional context
     important_context: context.important_context || {},

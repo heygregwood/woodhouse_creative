@@ -72,6 +72,8 @@ async function fetchSessions() {
       files_touched: data.files_touched || [],
       outcome: data.outcome || 'unknown',
       user_request: data.user_request || null,
+      plan: data.plan || null,
+      plan_status: data.plan_status || null,
     };
   });
 }
@@ -195,6 +197,8 @@ async function queryMode(sessions, query) {
     blockers: s.blockers,
     files: s.files_touched,
     outcome: s.outcome,
+    ...(s.plan && { plan: s.plan }),
+    ...(s.plan_status && { plan_status: s.plan_status }),
   }));
 
   const systemPrompt = `You are a recall agent for a software development project. Your job is to find sessions relevant to the user's query and synthesize the context.
@@ -205,6 +209,7 @@ Given a list of session summaries and a query, you must:
 1. Identify sessions that are semantically relevant (not just keyword matching)
 2. Synthesize information across sessions
 3. Return a clear summary of what was done, decisions made, and any blockers
+4. If any relevant session has a 'plan' field, include the FULL plan text — plans are high-value context that must be preserved verbatim
 
 Output format (use exactly this structure):
 ## Relevant Sessions
@@ -221,6 +226,11 @@ Output format (use exactly this structure):
 
 ## Files Involved
 [Bullet list of files touched, or "None recorded" if empty]
+
+## Active Plan
+[If any relevant session has a plan field, include the full plan text here with its plan_status. If no plan exists, omit this section entirely.]
+
+EXCEPTION: Always include the full plan text if one exists — never summarize or truncate plans.
 
 Be concise. Only include information that's relevant to the query.`;
 
