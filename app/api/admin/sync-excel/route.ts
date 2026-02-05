@@ -110,6 +110,9 @@ export async function GET() {
         }
       }
 
+      // Count removed FULL dealers needing spreadsheet cleanup
+      const removedFullCount = changes.removed.filter(d => d.program_status === 'FULL').length;
+
       return NextResponse.json({
         success: true,
         changes: {
@@ -125,10 +128,13 @@ export async function GET() {
         pendingReviewCount: pendingReviewDealers.length,
         pendingReviewDealers,
         blockedDealersSkipped: blockedDealers,
+        removedFullCount,
       });
     }
 
     // No changes - return the preview
+    const removedFullCount = changes.removed.filter(d => d.program_status === 'FULL').length;
+
     return NextResponse.json({
       success: true,
       changes: {
@@ -144,6 +150,7 @@ export async function GET() {
       pendingReviewCount: 0,
       pendingReviewDealers: [],
       blockedDealersSkipped: [],
+      removedFullCount,
     });
   } catch (error) {
     console.error('[sync-excel] Error:', error);

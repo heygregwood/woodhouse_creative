@@ -13,6 +13,7 @@ import { createRenderBatch, createRenderJob } from '@/lib/renderQueue';
 // GET - List dealers by section
 // ?section=pending (default) - dealers with review_status='pending_review'
 // ?section=existing - all FULL dealers with ready_for_automate='yes'
+// ?section=removed-full - removed FULL dealers needing spreadsheet cleanup
 export async function GET(request: NextRequest) {
   try {
     const section = request.nextUrl.searchParams.get('section') || 'pending';
@@ -34,6 +35,22 @@ export async function GET(request: NextRequest) {
         success: true,
         count: dealers.length,
         dealers,
+      });
+    }
+
+    if (section === 'removed-full') {
+      // Get all dealers and filter for removed FULL needing spreadsheet cleanup
+      const allDealers = await getDealers();
+      const removedFull = allDealers.filter(d =>
+        d.allied_status === 'REMOVED' &&
+        d.program_status === 'FULL' &&
+        !d.scheduling_cleanup_done
+      );
+
+      return NextResponse.json({
+        success: true,
+        count: removedFull.length,
+        dealers: removedFull,
       });
     }
 
@@ -67,7 +84,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Build partial update from provided fields only
-    const updates: Record<string, string> = {};
+    const updates: Record<string, string | boolean> = {};
     const updatedFields: string[] = [];
 
     if (display_name !== undefined) {
@@ -85,6 +102,10 @@ export async function PATCH(request: NextRequest) {
     if (creatomate_logo !== undefined) {
       updates.creatomate_logo = creatomate_logo;
       updatedFields.push('creatomate_logo');
+    }
+    if (body.scheduling_cleanup_done !== undefined) {
+      updates.scheduling_cleanup_done = body.scheduling_cleanup_done;
+      updatedFields.push('scheduling_cleanup_done');
     }
 
     if (updatedFields.length === 0) {

@@ -6,6 +6,36 @@ All notable changes to Woodhouse Creative are documented here.
 
 ---
 
+## [2026-02-05] - Removed FULL Dealer Spreadsheet Cleanup Tracking
+
+### Added
+- **Cleanup tracking field** — `scheduling_cleanup_done` boolean on `FirestoreDealer` interface
+  - `lib/firestore-dealers.ts` — New field + `markSchedulingCleanupDone()` helper
+- **Dealer review cleanup section** — New card on `/admin/dealer-review`
+  - Lists removed FULL dealers whose columns still exist in scheduling spreadsheet
+  - "Done" button marks cleanup complete, removes dealer from list
+  - Auto-hides when no dealers need cleanup
+  - `app/api/admin/dealer-review/route.ts` — New `?section=removed-full` GET handler + PATCH support
+- **Sync warning banner** — After Excel sync on `/admin`, red banner shows if removed dealers were FULL
+  - Links to `/admin/dealer-review` cleanup list
+  - `app/api/admin/sync-excel/route.ts` — Returns `removedFullCount` in response
+
+### Fixed
+- **Row 10 distributor bug** — `scripts/sync_spreadsheet.py` was writing `dealer_name` to row 10 instead of `distributor_name`
+  - Added `distributor_name` to SQL query and dealer dict
+  - Fixed row 10 write to use `distributor_name`
+  - Ran one-time fix to correct all 124 columns in scheduling spreadsheet
+
+### Files Changed
+- `lib/firestore-dealers.ts:71,237-248` — New field + helper function
+- `app/api/admin/dealer-review/route.ts:39-54,106-110` — New GET section + PATCH field
+- `app/admin/dealer-review/page.tsx:16-25,87-119,360-395` — State, fetch, handler, JSX section
+- `app/api/admin/sync-excel/route.ts:113,133` — Added `removedFullCount` to responses
+- `app/admin/page.tsx:29,170-185` — Interface update + warning banner
+- `scripts/sync_spreadsheet.py:93,108,214-216` — Fixed distributor bug
+
+---
+
 ## [2026-01-28] - Add Checkpoint Buffer System for Session Persistence
 
 ### Added

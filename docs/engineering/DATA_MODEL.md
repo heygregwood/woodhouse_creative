@@ -87,6 +87,7 @@ interface FirestoreDealer {
   ready_for_automate?: string; // 'yes' when all fields validated
   logo_needs_design?: number;  // 1 if logo needs design work
   logo_source?: string;        // 'brandfetch', 'website', 'manual'
+  scheduling_cleanup_done?: boolean; // true when removed FULL dealer's spreadsheet column has been deleted
   review_status?: string;      // 'pending_review' | null
 
   // Facebook

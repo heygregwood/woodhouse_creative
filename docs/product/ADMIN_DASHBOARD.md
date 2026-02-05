@@ -1,6 +1,6 @@
 # Admin Dashboard
 
-**Last Updated:** January 27, 2026
+**Last Updated:** February 5, 2026
 **URL:** https://woodhouse-creative.vercel.app/admin
 **Local:** http://localhost:3000/admin
 
@@ -64,9 +64,19 @@ The admin dashboard provides tools for managing dealer automation, batch renderi
 
 ---
 
-### `/admin/dealer-review` - Dealer Approval
+### `/admin/dealer-review` - Dealer Review & Management
 
-**Purpose:** Review and approve dealers promoted to FULL status.
+**Purpose:** Two sections — approve new FULL dealers and manage existing dealer details.
+
+**Architecture:** Modular component structure:
+- `page.tsx` — orchestrator with shared state (~230 lines)
+- `components/DealerCard.tsx` — reusable editable form card (~270 lines)
+- `components/LogoFinderOverlay.tsx` — shared logo finder modal (~170 lines)
+- `components/ManageExistingDealers.tsx` — section 2 container (~270 lines)
+
+#### Section 1: Pending Review
+
+Dealers promoted from CONTENT → FULL appear here for validation.
 
 **Workflow:**
 1. Dealer is promoted from CONTENT → FULL (via Gmail webhook or manual)
@@ -76,19 +86,63 @@ The admin dashboard provides tools for managing dealer automation, batch renderi
    - Phone number (formatted: 630-555-1234)
    - Website (domain only: wsminc.net)
    - Logo (select from Brandfetch, website, Facebook)
-4. Click "Approve" to set `ready_for_automate = 'yes'`
-
-**Logo Sources:**
-- **Brandfetch** - Professional logo API
-- **Website** - Favicon, apple-touch-icon, og:image
-- **Facebook** - Profile photo, cover photo
+4. Click "Approve & Add to Spreadsheet"
 
 **Post-Approval Actions:**
 After approval, the system automatically:
 1. Adds dealer column to scheduling spreadsheet
-2. Queues renders for active posts
-3. Sends welcome email (if not sent)
-4. Notifies Olivia of new FULL dealer
+2. Populates personalized post copy for active posts
+3. Creates render batches for all active posts
+4. Sends FB Admin Accepted email to dealer
+5. Notifies Olivia of new FULL dealer
+
+#### Removed FULL Dealers — Spreadsheet Cleanup
+
+When Excel sync removes FULL dealers, their columns remain in the scheduling spreadsheet. This section lists them so Greg can manually delete the columns.
+
+**Behavior:**
+- Auto-loads on page mount alongside pending review
+- Shows red-bordered card with dealer name, number, and "Done" button
+- Clicking "Done" marks `scheduling_cleanup_done = true` in Firestore, removes from list
+- Section auto-hides when no dealers need cleanup
+- Also triggered from `/admin` page warning banner after Excel sync
+
+**API:** Uses `GET /api/admin/dealer-review?section=removed-full` to fetch list, `PATCH /api/admin/dealer-review` with `scheduling_cleanup_done: true` to mark done.
+
+#### Section 2: Manage Existing Dealers
+
+View and edit details for all approved FULL dealers.
+
+**Features:**
+- **Lazy loading** — dealers load on first click of "Load Existing Dealers" button
+- **Search** — filter by dealer name or number (client-side, instant)
+- **Default view** — last 10 recently modified dealers (sorted by `updated_at` desc)
+- **Show All** — expands to full alphabetical list of all FULL dealers
+- **Inline editing** — display name, phone, website, logo URL
+- **Save Changes** — updates Firestore only (no re-renders, no spreadsheet sync)
+- **Compact cards** — collapsed one-line view, click to expand for editing
+
+**Use Cases:**
+- Dealer requests a different logo
+- Wrong phone number or website needs correction
+- Display name needs adjustment
+
+**API:** Uses `PATCH /api/admin/dealer-review` for field-only updates.
+
+#### Shared: Logo Finder Overlay
+
+Both sections share the same logo finder modal.
+
+**Logo Sources:**
+- **Brandfetch** — Professional logo API
+- **Website** — Favicon, apple-touch-icon, og:image
+- **Facebook** — Profile photo, cover photo
+
+**Logo Save Flow:**
+1. Click "Find Logo" on any dealer card
+2. Modal searches dealer's website for logos
+3. Select a logo → downloads to Google Drive staging folder (PNG conversion)
+4. Click "Save Permanently & Auto-Fill" → moves to permanent location, updates dealer field
 
 ---
 
@@ -119,11 +173,21 @@ After approval, the system automatically:
 ### Onboard New FULL Dealer
 
 1. Navigate to `/admin/dealer-review`
-2. Find dealer in pending list
-3. Validate all fields
-4. Select best logo
-5. Click "Approve"
-6. System handles spreadsheet, renders, emails
+2. Find dealer in pending list (Section 1)
+3. Validate display name, phone, website
+4. Click "Find Logo" → select best logo → save permanently
+5. Click "Approve & Add to Spreadsheet"
+6. System handles spreadsheet, post copy, renders, emails
+
+### Edit Existing Dealer Details
+
+1. Navigate to `/admin/dealer-review`
+2. Scroll to "Manage Existing Dealers" (Section 2)
+3. Click "Load Existing Dealers"
+4. Search by name or number, or browse recent
+5. Click "Edit" to expand dealer card
+6. Update display name, phone, website, or logo
+7. Click "Save Changes" (updates Firestore only)
 
 ### Create a New Post
 

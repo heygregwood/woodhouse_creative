@@ -13,6 +13,15 @@ export default function DealerReviewPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const [approveResults, setApproveResults] = useState<Record<string, ApprovalResult>>({});
 
+  // --- Removed FULL dealers needing spreadsheet cleanup ---
+  const [removedFullDealers, setRemovedFullDealers] = useState<Array<{
+    dealer_no: string;
+    dealer_name: string;
+    display_name?: string | null;
+  }>>([]);
+  const [removedFullLoading, setRemovedFullLoading] = useState(true);
+  const [cleaningUp, setCleaningUp] = useState<string | null>(null);
+
   // --- Shared logo overlay state ---
   const [logoOverlay, setLogoOverlay] = useState<LogoOverlayState | null>(null);
 
@@ -75,9 +84,44 @@ export default function DealerReviewPage() {
     }
   }, [formatDisplayName, formatPhone, formatWebsite]);
 
+  const fetchRemovedFull = useCallback(async () => {
+    try {
+      setRemovedFullLoading(true);
+      const response = await fetch('/api/admin/dealer-review?section=removed-full');
+      const data = await response.json();
+      if (data.success) {
+        setRemovedFullDealers(data.dealers);
+      }
+    } catch {
+      // Silent fail - secondary section
+    } finally {
+      setRemovedFullLoading(false);
+    }
+  }, []);
+
+  const handleCleanupDone = async (dealerNo: string) => {
+    try {
+      setCleaningUp(dealerNo);
+      const response = await fetch('/api/admin/dealer-review', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealer_no: dealerNo, scheduling_cleanup_done: true }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setRemovedFullDealers(prev => prev.filter(d => d.dealer_no !== dealerNo));
+      }
+    } catch {
+      // Silent fail
+    } finally {
+      setCleaningUp(null);
+    }
+  };
+
   useEffect(() => {
     fetchPendingDealers();
-  }, [fetchPendingDealers]);
+    fetchRemovedFull();
+  }, [fetchPendingDealers, fetchRemovedFull]);
 
   const updatePendingField = (dealerNo: string, field: string, value: string) => {
     setPendingDealers((prev) =>
@@ -310,6 +354,46 @@ export default function DealerReviewPage() {
                 formatWebsite={formatWebsite}
               />
             ))}
+          </div>
+        )}
+
+        {/* Section: Removed FULL Dealers Needing Spreadsheet Cleanup */}
+        {!removedFullLoading && removedFullDealers.length > 0 && (
+          <div className="mt-8 mb-4">
+            <div className="bg-white border border-red-300 rounded-lg shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-red-200 bg-red-50">
+                <h2 className="text-lg font-semibold text-red-800">
+                  Removed FULL Dealers — Spreadsheet Cleanup
+                </h2>
+                <p className="text-sm text-red-600 mt-1">
+                  These dealers were removed from Allied but still have columns in the scheduling spreadsheet.
+                  Remove their column, then click &quot;Done&quot;.
+                </p>
+              </div>
+              <div className="divide-y divide-red-100">
+                {removedFullDealers.map(dealer => (
+                  <div key={dealer.dealer_no} className="px-6 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {dealer.display_name || dealer.dealer_name}
+                      </p>
+                      <p className="text-sm text-gray-500">#{dealer.dealer_no}</p>
+                    </div>
+                    <button
+                      onClick={() => handleCleanupDone(dealer.dealer_no)}
+                      disabled={cleaningUp === dealer.dealer_no}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        cleaningUp === dealer.dealer_no
+                          ? 'bg-gray-300 text-gray-500 cursor-wait'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                      }`}
+                    >
+                      {cleaningUp === dealer.dealer_no ? 'Marking...' : 'Done'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

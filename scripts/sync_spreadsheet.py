@@ -89,7 +89,8 @@ def get_dealers_from_db() -> dict:
             dealer_name,
             contact_first_name,
             contact_email,
-            region
+            region,
+            distributor_name
         FROM dealers
         WHERE program_status = 'FULL'
     """)
@@ -105,6 +106,7 @@ def get_dealers_from_db() -> dict:
             'first_name': row['contact_first_name'] or '',
             'email': row['contact_email'] or '',
             'region': row['region'] or '',
+            'distributor_name': row['distributor_name'] or '',
         }
 
     conn.close()
@@ -208,10 +210,10 @@ def sync_dealer_metadata(service, rows, dealers_db, dry_run=False):
                 'values': [[dealer['phone']]]
             })
 
-            # Row 10: Distributor (using dealer_name from Allied)
+            # Row 10: Distributor Name
             updates.append({
                 'range': f"Sheet1!{col_letter}10",
-                'values': [[dealer['dealer_name']]]
+                'values': [[dealer['distributor_name']]]
             })
 
             # Row 11: Display Name

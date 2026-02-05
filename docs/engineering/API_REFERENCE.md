@@ -1,6 +1,6 @@
 # API Reference
 
-**Last Updated:** January 27, 2026
+**Last Updated:** February 5, 2026
 **Base URL:** `https://woodhouse-creative.vercel.app/api`
 **Local:** `http://localhost:3000/api`
 
@@ -28,18 +28,40 @@ Fetch dealers with optional filters.
 
 ---
 
-#### GET/POST `/api/admin/dealer-review`
+#### GET/POST/PATCH `/api/admin/dealer-review`
 
-**GET:** List dealers pending review
+**GET:** List dealers by section
+
+| Query Param | Value | Description |
+|-------------|-------|-------------|
+| `section` | `pending` (default) | Dealers with `review_status = 'pending_review'` |
+| `section` | `existing` | All FULL dealers with `ready_for_automate = 'yes'`, sorted by `updated_at` desc |
+| `section` | `removed-full` | Removed FULL dealers needing spreadsheet cleanup (`allied_status = 'REMOVED'`, `program_status = 'FULL'`, `scheduling_cleanup_done != true`) |
+
 ```json
 {
+  "success": true,
+  "count": 130,
   "dealers": [
     { "dealer_no": "10251015", "dealer_name": "...", "review_status": "pending_review" }
   ]
 }
 ```
 
-**POST:** Approve dealer after review
+**POST:** Approve dealer after review (full automation pipeline)
+```json
+{
+  "dealer_no": "10251015",
+  "display_name": "Wiesbrook Sheet Metal",
+  "creatomate_phone": "630-555-1234",
+  "creatomate_website": "wsminc.net",
+  "creatomate_logo": "https://drive.google.com/...",
+  "region": "North"
+}
+```
+Triggers: spreadsheet column, post copy population, render batches, emails to dealer + Olivia.
+
+**PATCH:** Update dealer fields only (no automation). Also supports `scheduling_cleanup_done: true` for marking removed FULL dealer spreadsheet cleanup complete.
 ```json
 {
   "dealer_no": "10251015",
@@ -47,6 +69,16 @@ Fetch dealers with optional filters.
   "creatomate_phone": "630-555-1234",
   "creatomate_website": "wsminc.net",
   "creatomate_logo": "https://drive.google.com/..."
+}
+```
+All fields except `dealer_no` are optional — only provided fields are updated.
+
+**Response:**
+```json
+{
+  "success": true,
+  "dealer_no": "10251015",
+  "updated_fields": ["display_name", "creatomate_phone"]
 }
 ```
 

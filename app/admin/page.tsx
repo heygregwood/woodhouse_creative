@@ -26,6 +26,7 @@ interface SyncResult {
   emailResults?: Array<{ dealer_no: string; email_type?: string; success: boolean; error?: string }>;
   pendingReviewCount?: number;
   pendingReviewDealers?: string[];
+  removedFullCount?: number;
 }
 
 export default function CreativeAdminPage() {
@@ -162,6 +163,24 @@ export default function CreativeAdminPage() {
                             className="inline-block mt-3 px-4 py-2 bg-yellow-400 text-yellow-900 rounded-lg hover:bg-yellow-300 transition-colors font-medium text-sm"
                           >
                             Review Now
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Removed FULL Dealers Warning */}
+                      {(syncResult.removedFullCount || 0) > 0 && (
+                        <div className="p-4 bg-red-50 border border-red-400 rounded-lg">
+                          <p className="font-semibold text-red-800">
+                            {syncResult.removedFullCount} removed dealer(s) need to be removed from the scheduling spreadsheet
+                          </p>
+                          <p className="text-sm text-red-700 mt-1">
+                            These FULL dealers were removed from Allied and their columns should be removed from the scheduling spreadsheet.
+                          </p>
+                          <a
+                            href="/admin/dealer-review"
+                            className="inline-block mt-3 px-4 py-2 bg-red-400 text-red-900 rounded-lg hover:bg-red-300 transition-colors font-medium text-sm"
+                          >
+                            View Cleanup List
                           </a>
                         </div>
                       )}

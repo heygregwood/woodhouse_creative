@@ -68,6 +68,7 @@ export interface FirestoreDealer {
   logo_needs_design?: number | null;
   logo_source?: string | null;
   review_status?: string | null;
+  scheduling_cleanup_done?: boolean;
 
   // Facebook
   facebook_page_id?: string | null;
@@ -229,6 +230,21 @@ export async function markDealerRemoved(dealerNo: string): Promise<void> {
     console.log(`[firestore-dealers] Marked dealer ${dealerNo} as REMOVED`);
   } catch (error: unknown) {
     console.error(`[firestore-dealers] Error marking dealer ${dealerNo} as removed:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Mark scheduling spreadsheet cleanup as done for a removed FULL dealer
+ */
+export async function markSchedulingCleanupDone(dealerNo: string): Promise<void> {
+  try {
+    await updateDealer(dealerNo, {
+      scheduling_cleanup_done: true,
+    });
+    console.log(`[firestore-dealers] Marked scheduling cleanup done for dealer ${dealerNo}`);
+  } catch (error: unknown) {
+    console.error(`[firestore-dealers] Error marking cleanup done for ${dealerNo}:`, error);
     throw error;
   }
 }
