@@ -1,9 +1,9 @@
 # Woodhouse Creative - AI Assistant Context
 
 **Purpose:** Internal creative automation for Woodhouse Agency Allied Air dealers
-**Status:** Active - 124 FULL dealers ready for automation
+**Status:** Active - 129 FULL dealers ready for automation
 **Deployed:** https://woodhouse-creative.vercel.app
-**Last Updated:** January 18, 2026
+**Last Updated:** February 5, 2026
 
 ---
 
@@ -21,7 +21,7 @@
 |--------|-------------------------------|------------------|
 | **Purpose** | Internal agency ops for Allied Air | SaaS product for customers |
 | **Database** | `woodhouse-creative-db` (named) | Default Firestore database |
-| **Users** | 351 Allied Air dealers | Paying SaaS customers |
+| **Users** | 370 Allied Air dealers | Paying SaaS customers |
 | **Content** | Custom Creatomate renders per dealer | Shared reel_library + AI selection |
 | **Scheduling** | Batch renders → Drive folders → Spreadsheet | AI scheduler → Late API |
 | **Location** | `~/woodhouse_creative` | `~/woodhouse_social` |
@@ -412,289 +412,24 @@ git push
 
 ---
 
-### Session Hooks (Context Continuity)
+### Session Persistence (Centralized)
 
-**File:** `.claude/settings.local.json` (local only, not committed)
+Session persistence is handled by **centralized scripts** in `~/.agents/scripts/` shared across all repos. Global hooks in `~/.claude/settings.json` run PreCompact (auto-save) and SessionStart (auto-load) automatically.
 
-Session hooks are configured to help with context continuity across Claude Code sessions:
+**Write checkpoint** every 5-10 min to `.claude-checkpoint.json` (required fields: `summary`, `topics`, `user_request`).
 
-| Hook | Trigger | What It Does |
-|------|---------|--------------|
-| `PreCompact` | Before context compaction | Reads `.claude-checkpoint.json`, validates, and saves to Firestore via `save-checkpoint.js` |
-| `SessionStart` | New session starts | Reads latest context from Firestore `claude_sessions` collection |
-
-**Configuration:**
-- `autoCompactThreshold: 30` - Auto-compacts after 30 conversation turns
-
-**Note:** These hooks are machine-local (globally gitignored). Each developer sets up their own.
-
----
-
-### Checkpoint Buffer System (Context Continuity)
-
-**Problem:** Auto-compaction happens without warning at 30 turns. Behavioral rules ("save when you decide to") are bottlenecks because they depend on consistency. Even with good intentions, plans and work can be lost if compaction wins the race before a manual save.
-
-**Solution:** Checkpoint buffer file (`.claude-checkpoint.json`) on disk that persists between compactions. PreCompact hook reads the checkpoint and saves it to Firestore automatically, regardless of whether I remembered to save.
-
-**Key Idea:** Decouple writing the checkpoint (frequent work) from the save mechanism (automatic PreCompact hook). The file is always on disk; the hook always runs.
-
-#### When to Write Checkpoint
-
-Write every **5-10 minutes of work** (not per code edit, not per todo). Checkpoints are lightweight snapshots, not granular audit logs.
-
-**Examples:**
-- After completing a logical work block (feature, test, refactor)
-- After a discussion that clarifies direction
-- Before switching topics
-- When you notice a new plan emerging
-- Before committing code
-- Any time you want to "lock in" current progress
-
-**Don't write:**
-- On every code edit (too frequent)
-- On every todo creation (use the summary instead)
-- When nothing meaningful has changed
-
-#### Checkpoint Schema
-
-File: `.claude-checkpoint.json` (project root, tracked in git for cross-machine sync)
-
-```json
-{
-  "last_updated": "2026-01-28T06:30:00Z",
-  "summary": "Building checkpoint buffer system for session persistence",
-  "plan": "1. Create save-checkpoint.js\n2. Update PreCompact hook\n3. Test checkpoint save flow",
-  "plan_status": "step 1 of 3 in progress",
-  "topics": ["session-persistence", "checkpoint-buffer"],
-  "user_request": "Improve session save triggers with buffer mechanism",
-  "decisions": ["Use checkpoint file as buffer", "Write every 5-10 min"],
-  "blockers": [],
-  "entities": ["Firestore", "PreCompact hook"],
-  "files_touched": ["scripts/save-checkpoint.js", "CLAUDE.md"],
-  "commits": [],
-  "important_context": {}
-}
-```
-
-**Required fields:**
-- `summary` (string, non-empty) — what's being worked on
-- `topics` (array, non-empty) — 2-5 topics
-- `user_request` (string, non-empty) — original ask or current goal
-
-**Optional fields:**
-- `plan` — full plan text (include if active)
-- `plan_status` — progress through plan (e.g., "step 3 of 5 complete")
-- `decisions`, `blockers`, `entities`, `files_touched`, `commits` — all arrays
-- `important_context` — flexible key/value pairs
-- `last_updated` — ISO timestamp (informational)
-
-#### How It Works
-
-```
-Claude writes .claude-checkpoint.json (every 5-10 min)
-                    ↓
-         Auto-compaction at 30 turns
-                    ↓
-         PreCompact hook fires
-                    ↓
-  scripts/save-checkpoint.js runs
-                    ↓
-   Reads checkpoint, validates, writes to Firestore
-                    ↓
-  SessionStart hook loads from Firestore on next session
-```
-
-**Validation (light):**
-- Required fields present and non-empty
-- Field types correct (arrays are arrays, strings are strings)
-- If validation fails: skip save, log to `session_log.txt`, don't error
-
-**Benefits:**
-- Survives auto-compaction without manual intervention
-- No race condition between Greg typing "save session" and compaction
-- Works across machines (tracked in git, pulled to laptop/desktop)
-- Captured context is always the latest checkpoint, not pre-compaction summary
-
-#### Setup: PreCompact Hook
-
-The PreCompact hook is configured in `.claude/settings.local.json` (machine-local, not committed).
-
-**To enable checkpoint saves on your machine:**
-
-1. Open `.claude/settings.local.json` in your project root
-2. Find or create the `hooks` object:
-   ```json
-   {
-     "hooks": {
-       "PreCompact": "node scripts/save-checkpoint.js --trigger=pre_compact"
-     }
-   }
-   ```
-3. Save the file (no commit needed — it's gitignored)
-4. Restart Claude Code for the hook to take effect
-
-**That's it.** From now on, whenever you run `/compact`:
-1. PreCompact hook runs `save-checkpoint.js`
-2. Script reads `.claude-checkpoint.json`
-3. Validates, transforms, writes to Firestore
-4. Logs result to `docs/archive/sessions/session_log.txt`
-5. Compaction proceeds (you never lose the checkpoint)
-
-**Troubleshooting:**
-- If hook doesn't fire: Restart Claude Code
-- If checkpoint saves are failing: Check `session_log.txt` for validation errors
-- If `.claude-checkpoint.json` is missing: Hook silently skips (no error)
-
----
-
-### Session Context Persistence (MANDATORY)
-
-**Purpose:** Long-term memory system that survives auto-compaction and enables recall of past work.
-
-**Firestore Collection:** `claude_sessions` (in DEFAULT database, shared with woodhouse_social)
-
-**Scripts:**
-- **Write:** `echo '{"summary": "...", "topics": [...]}' | node scripts/write-session-context.js`
-- **Read (SessionStart):** `node scripts/read-session-context.js` (runs automatically)
-- **Query:** `node scripts/recall-agent.js "batch render"` (semantic search)
-
-**Schema:**
-```typescript
-{
-  created_at: Timestamp,
-  machine: string,
-  repo: 'woodhouse_creative',
-  trigger: 'task_complete' | 'decision' | 'blocker' | 'topic_switch' | 'pre_compact' | 'periodic' | 'plan_created',
-
-  // Core (REQUIRED)
-  summary: string,           // What was accomplished
-
-  // AI-extracted metadata
-  topics: string[],          // DYNAMIC - extracted from conversation
-  decisions: string[],       // Key decisions made
-  blockers: string[],        // Issues preventing progress
-  entities: string[],        // Named things (Allied, Creatomate, components)
-  files_touched: string[],   // Files modified
-
-  // Status tracking
-  outcome: 'completed' | 'in_progress' | 'blocked' | 'abandoned',
-  user_request: string,      // Original ask that started work
-  commits: string[],         // Git SHAs
-  session_boundary: boolean, // true if at compact/session end
-
-  // Plan persistence (survives compaction)
-  plan?: string,             // Full plan text (when trigger is plan_created or plan is active)
-  plan_status?: string,      // Progress tracker, e.g. "step 6 of 13 complete"
-
-  // Flexible
-  important_context: object
-}
-```
-
----
-
-### Save Triggers (Event-Driven) - MANDATORY
-
-**MUST save (never skip):**
-- After completing any task or todo item (`trigger: 'task_complete'`)
-- After making a significant decision (`trigger: 'decision'`)
-- When hitting a blocker (`trigger: 'blocker'`)
-- Before switching to a different topic (`trigger: 'topic_switch'`)
-- Before user runs `/compact` (`trigger: 'pre_compact'`)
-- **After creating or entering plan mode** (`trigger: 'plan_created'`) — include full plan text in `plan` field
-
-**SHOULD save (when appropriate):**
-- After ~10 conversation turns if no other trigger
-- After modifying multiple files
-- When making progress through a plan (update `plan_status` field, e.g. "step 4 of 10 complete")
-
----
-
-### Plan Persistence (MANDATORY)
-
-**Problem:** Plans created in plan mode or multi-step task plans are lost when auto-compaction occurs at 30 turns. Greg's workaround — manually typing "save session" before compaction — is race-prone.
-
-**Solution:** Save early, not late. Save when the plan/todos are CREATED, not when work is finishing.
-
-**Rule:** When Claude creates a plan (via plan mode OR by creating 3+ todos), Claude MUST save it to session context **immediately** with `trigger: 'plan_created'` and the full plan text in the `plan` field.
-
-**When to save a plan:**
-- After exiting plan mode (plan approved by user)
-- **After creating 3+ todos via TodoWrite** — these ARE the plan in non-plan-mode workflows
-- When a plan spans multiple work sessions
-
-**What to include in the `plan` field:**
-- Full numbered step list with descriptions
-- The user's original request and WHY each step exists
-- Current step status (done/pending/blocked)
-- Key constraints or decisions baked into the plan
-
-**What to include in `user_request`:**
-- The original ask that prompted the todos/plan (verbatim or close to it)
-
-**Example — plan mode:**
-```json
-{
-  "trigger": "plan_created",
-  "summary": "Created 8-step Creatomate batch render plan",
-  "plan": "1. Query existing render queue\n2. Filter by status=pending\n3. Group by template type\n4. Generate render tasks\n5. Submit to Creatomate API\n6. Poll for completion\n7. Update spreadsheet\n8. Archive completed tasks",
-  "plan_status": "step 2 of 8 complete",
-  "topics": ["batch render", "creatomate"],
-  "user_request": "Automate Creatomate batch rendering for FULL dealers",
-  "outcome": "in_progress"
-}
-```
-
-**Example — emergent todos (no plan mode):**
-```json
-{
-  "trigger": "plan_created",
-  "summary": "Created 4-step plan: add checkpoint buffer system to woodhouse_creative",
-  "plan": "1. Create save-checkpoint.js\n2. Update write-session-context.js for plan fields\n3. Update recall-agent.js for plan retrieval\n4. Update CLAUDE.md with checkpoint documentation",
-  "plan_status": "0 of 4 complete",
-  "topics": ["checkpoint buffer", "session persistence"],
-  "user_request": "Add checkpoint buffer system to woodhouse_creative for cross-machine sync",
-  "outcome": "in_progress"
-}
-```
-
-**Progress updates:** When completing plan steps, save with `trigger: 'task_complete'` and update `plan_status`. No need to repeat the full plan text on progress saves — only on creation or major plan changes.
-
-**Timing:** The save happens IMMEDIATELY after todos are created — before any work begins. This front-loads persistence so auto-compaction can't eat it.
-
----
-
-### How to Save Session Context (MANDATORY)
-
-**CRITICAL:** Session saves are MANUAL. Hooks cannot access conversation content, so Claude must run the save command directly.
-
-**⚠️ DO NOT prefix with `set -a && source .env.local` — the script loads `.env.local` via dotenv internally. Adding shell source commands breaks the stdin pipe.**
-
-**Command (Option A — file argument, most reliable):**
+**Manual save:**
 ```bash
-node scripts/write-session-context.js /tmp/claude-session-context.json
+node ~/.agents/scripts/write-session-context.js /tmp/claude-session-context.json
 ```
-Write the JSON to the file first using the Write tool, then run the command above.
 
-**Command (Option B — pipe):**
+**Recall:**
 ```bash
-echo '{"summary": "...", "topics": [...], "trigger": "task_complete", ...}' | node scripts/write-session-context.js
+node ~/.agents/scripts/recall-agent.js "batch render"   # Query mode
+node ~/.agents/scripts/recall-agent.js --plan            # Full plan text
 ```
 
-**For multi-task sessions using TodoWrite:**
-- Add "Save session context to Firestore" as the FINAL todo item
-- Mark it in_progress when starting the save
-- Mark it completed after the script runs successfully
-
-**Example todo list for multi-task session:**
-```
-1. [completed] Update batch render template mapping
-2. [completed] Fix email sender for FULL dealers
-3. [completed] Update CHANGELOG.md
-4. [in_progress] Save session context to Firestore  <-- Always last
-```
-
-**Why this matters:** Without manual saves, work is lost when auto-compaction occurs at 30 turns. The SessionStart hook only READS previous sessions - it cannot WRITE them.
+See `woodhouse_social/.claude/rules/session-persistence.md` for full schema and save triggers.
 
 ---
 
@@ -741,7 +476,7 @@ When user asks patterns like these, run the recall agent:
 - "what did we decide about X"
 - "pick up where we left off on X"
 
-**Command:** `node scripts/recall-agent.js "user's query here"`
+**Command:** `node ~/.agents/scripts/recall-agent.js "user's query here"`
 
 ---
 
@@ -1025,16 +760,16 @@ docs/
 
 ---
 
-## Current Status (January 2026)
+## Current Status (February 2026)
 
 ### Database: Firestore (woodhouse-creative-db)
 
 | Metric | Count | Notes |
 |--------|-------|-------|
-| **Total Dealers** | 351 | Firestore source of truth |
-| **FULL Dealers** | 130 | Ready for full automation |
-| **CONTENT Dealers** | 221 | Content only |
-| **Ready for Automate** | 130/130 | All FULL dealers ready |
+| **Total Dealers** | 370 | Firestore source of truth |
+| **FULL Dealers** | 129 | Ready for full automation |
+| **CONTENT Dealers** | 241 | Content only |
+| **Ready for Automate** | 129/129 | All FULL dealers ready |
 
 ### Batch Rendering
 - Cron processes 25 jobs/minute (Creatomate rate limit: 30 req/10s)
@@ -1575,8 +1310,8 @@ CRON_SECRET=
 - Exception: `TEMP-XXX` for dealers not yet in Allied system
 
 ### Program Status
-- `FULL` (124 dealers) - We have FB admin access, handle posting
-- `CONTENT` (209 dealers) - We create content, they post it
+- `FULL` (129 dealers) - We have FB admin access, handle posting
+- `CONTENT` (241 dealers) - We create content, they post it
 
 ### Creatomate Fields
 All validated for video generation:
