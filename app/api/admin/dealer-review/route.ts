@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       creatomate_phone,
       creatomate_website: creatomate_website || '',
       creatomate_logo,
-      region,
+      region: region || '',
     });
 
     // 2. Add dealer to scheduling spreadsheet
