@@ -12,7 +12,7 @@ import {
   getJobsByBatchId,
 } from '@/lib/renderQueue';
 import { verifyWebhookSignature, downloadVideo } from '@/lib/creatomate';
-import { uploadToGoogleDrive, archiveOldPosts } from '@/lib/google-drive';
+import { uploadToGoogleDrive, archiveOldPosts, getFolderIdByPath, listFilesInFolder } from '@/lib/google-drive';
 import { google } from 'googleapis';
 import type {
   CreatomateWebhookPayload,
@@ -197,6 +197,37 @@ export async function POST(request: NextRequest) {
         } catch (archiveError) {
           // Don't fail the whole upload if archiving fails
           console.error('Error archiving old posts (continuing with upload):', archiveError);
+        }
+
+        // Check for existing file with same name to prevent duplicates
+        const folderId = await getFolderIdByPath(folderPath);
+        const existingFiles = await listFilesInFolder(folderId, 'video/mp4');
+        const duplicate = existingFiles.find(f => f.name === fileName);
+
+        if (duplicate) {
+          console.log(`[webhook] File already exists: ${fileName} (${duplicate.id}), skipping upload`);
+
+          await updateRenderJob(job.id, {
+            status: 'completed',
+            renderUrl: payload.url,
+            driveFileId: duplicate.id,
+            driveUrl: `https://drive.google.com/file/d/${duplicate.id}/view`,
+            drivePath: `${folderPath}/${fileName}`,
+            completedAt: Timestamp.now(),
+            metadata: {
+              videoLength: payload.duration || 0,
+              creditsUsed: 7,
+              fileSize: payload.file_size || videoBuffer.byteLength,
+            },
+          });
+
+          await updateBatchProgress(job.batchId);
+
+          return NextResponse.json({
+            status: 'success',
+            message: 'Video already exists in Google Drive, skipped duplicate upload',
+            driveFileId: duplicate.id,
+          });
         }
 
         console.log(`Uploading to Google Drive: ${folderPath}/${fileName}`);
