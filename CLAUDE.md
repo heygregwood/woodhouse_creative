@@ -1415,7 +1415,44 @@ npx tsx scripts/test-microsoft-auth.ts
 
 ---
 
-## What's Next (Waiting On)
+## Allied Air Direct API Connection (ESTABLISHED Feb 2026)
 
-- **Allied Air API credentials** from Billy (developer) - enables automated dealer sync
-- Once received, implement `scripts/allied_api.py` for direct OAuth2 connection
+Direct connection to Allied Air's production OData API is working. Bypasses Billy's Azure APIM entirely.
+
+### Connection Details
+- **Endpoint:** `https://www.alliedconnect.com/odata2webservices/TurnkeySocialMedia/AAEDealers`
+- **Auth:** OAuth2 client_credentials with Basic auth header
+- **Credentials:** `TurnkeySocialMediaClient` / password in `.env.local`
+- **Token lifetime:** ~5 minutes (proactive refresh at 3 min)
+- **Pagination:** OData $top/$skip, 500 per page
+- **Total records:** 33,867 dealers (all Allied dealers, not just turnkey)
+
+### Pull Script
+```bash
+cd ~/woodhouse_creative
+set -a && source .env.local && set +a
+npx tsx scripts/test-allied-api.ts
+# Outputs: /tmp/allied-dealers-raw.json + /tmp/allied-dealers-flat.csv
+```
+
+### Data Files (Permanent Location)
+All analysis files from the Feb 23, 2026 pull are stored on OneDrive:
+```
+OneDrive/Woodhouse Business/Woodhouse_Social/Prospecting/Allied Air Dealers All Data/
+├── raw-data/          ← JSON: full API pull (33,867), pe_allied_dealers (7,105), WC Excel (382)
+├── analysis/          ← CSVs: flattened dealers, cross-reference, data source lineage
+├── scripts/           ← test-allied-api.ts, cross-reference.py
+├── crawl/             ← Deactivated dealer website crawl (100 sample)
+└── README.md          ← Full documentation of all files
+```
+
+### Key Finding: pe_allied_dealers is Stale
+The `pe_allied_dealers` collection in woodhouse_social (7,105 records from a 2023 CSV) has inaccurate segmentation. 162 "winback" dealers are actually Active. 77 "active suppress" dealers have opted out. Should be rebuilt from API ground truth. See `analysis/cross-reference-report.txt` for details.
+
+---
+
+## What's Next
+
+- **Rebuild pe_allied_dealers** from Allied API ground truth (in woodhouse_social)
+- **Deactivated dealer prospecting** — 59% of D dealers with websites are still live businesses
+- **Automate periodic API sync** — replace Excel-based sync with direct API pull

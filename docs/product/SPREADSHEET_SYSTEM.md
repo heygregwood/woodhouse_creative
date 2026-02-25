@@ -147,7 +147,7 @@ python3 scripts/sync_spreadsheet.py --sync-dealers
 | 7 | Region | `region` |
 | 8 | Website | `creatomate_website` |
 | 9 | Phone | `creatomate_phone` |
-| 10 | Distributor | `distributor_name` |
+| 10 | Distributor | `distributor_name` (bug fix 2026-02-05: was incorrectly writing `dealer_name`) |
 | 11 | Display Name | `display_name` |
 
 ---

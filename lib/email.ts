@@ -162,7 +162,7 @@ export async function getDealer(dealerNo: string): Promise<DealerData | null> {
   return {
     dealer_no: dealer.dealer_no,
     display_name: dealer.display_name || dealer.dealer_name || '',
-    contact_first_name: dealer.contact_first_name || null,
+    contact_first_name: dealer.contact_first_name || (dealer.contact_name ? dealer.contact_name.split(' ')[0] : null),
     contact_email: dealer.contact_email || null,
     distributor_name: dealer.distributor_name || null,
     program_status: dealer.program_status,

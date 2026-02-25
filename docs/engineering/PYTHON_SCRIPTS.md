@@ -125,7 +125,22 @@ python3 scripts/update_dealer_status.py --demote "Wiesbrook Sheet Metal"
 
 ### sync_spreadsheet.py
 
-Sync dealer metadata to Google Sheets.
+Sync dealer metadata to Google Sheets. Reads from SQLite and writes rows 5-11 for each dealer column.
+
+**Note:** Uses SQLite (legacy). The TypeScript version in `lib/google-sheets.ts` is used by the admin dashboard for new dealer onboarding.
+
+**Row mapping:**
+| Row | Field | DB Column |
+|-----|-------|-----------|
+| 5 | First Name | `contact_first_name` |
+| 6 | Email | `contact_email` |
+| 7 | Region | `region` |
+| 8 | Website | `creatomate_website` |
+| 9 | Phone | `creatomate_phone` |
+| 10 | Distributor | `distributor_name` |
+| 11 | Display Name | `display_name` |
+
+**Bug fix (2026-02-05):** Row 10 was writing `dealer_name` instead of `distributor_name`. Fixed in SQL query and row write. All 124 columns corrected.
 
 ```bash
 # Sync dealer metadata (rows 5-11)

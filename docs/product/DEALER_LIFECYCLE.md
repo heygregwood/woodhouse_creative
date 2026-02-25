@@ -1,6 +1,6 @@
 # Dealer Lifecycle
 
-**Last Updated:** January 13, 2026
+**Last Updated:** February 5, 2026
 
 ---
 
@@ -61,7 +61,7 @@ Dealers progress through distinct statuses as they move from signup to active au
 
 ## Status Details
 
-### CONTENT (209 dealers)
+### CONTENT (241 dealers)
 
 **Description:** We create social media content for these dealers, but they handle posting themselves.
 
@@ -80,7 +80,7 @@ Dealers progress through distinct statuses as they move from signup to active au
 
 ---
 
-### FULL (130 dealers)
+### FULL (129 dealers)
 
 **Description:** Full turnkey service. We have Facebook admin access and handle everything.
 
@@ -107,7 +107,10 @@ Dealers progress through distinct statuses as they move from signup to active au
 - `allied_status = 'REMOVED'`
 - Document preserved for MSA compliance
 - Not included in automation
-- Column hidden in spreadsheet
+- FULL dealers: scheduling spreadsheet column must be manually deleted
+  - Tracked via `scheduling_cleanup_done` field (added 2026-02-05)
+  - Cleanup list visible on `/admin/dealer-review` page
+  - Red warning banner appears on `/admin` after Excel sync if FULL dealers were removed
 
 ---
 
@@ -146,6 +149,9 @@ python3 scripts/update_dealer_status.py --promote --dealer-no 10251015
 **Automatic:**
 1. Excel sync detects dealer removed from Allied spreadsheet
 2. Dealer marked `allied_status: 'REMOVED'`
+3. Red warning banner appears on `/admin` page after sync
+4. Dealer appears in cleanup list on `/admin/dealer-review`
+5. Admin manually deletes column from scheduling spreadsheet, clicks "Done"
 
 **Manual:**
 ```bash
@@ -162,11 +168,11 @@ python3 scripts/update_dealer_status.py --demote --dealer-no 10251015
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| FULL (ready) | 130 | Fully automated |
+| FULL (ready) | 129 | Fully automated |
 | FULL (pending) | 0 | Awaiting review |
-| CONTENT | 221 | Content only |
-| REMOVED | varies | Historical |
-| **Total** | **351** | In Firestore |
+| CONTENT | 241 | Content only |
+| REMOVED | 30 | Historical |
+| **Total** | **370** | In Firestore |
 
 ---
 

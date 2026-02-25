@@ -1,6 +1,6 @@
 # TypeScript Modules Reference
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 27, 2026
 **Location:** `/lib/*.ts`
 
 ---
@@ -19,7 +19,7 @@ Core TypeScript modules that power the API and automation features.
 | [firestore-dealers.ts](#firestore-dealersts) | Dealer CRUD operations | ~360 |
 | [email.ts](#emailts) | Email sending (6 types) | ~400 |
 | [google-sheets.ts](#google-sheetsts) | Spreadsheet operations | ~350 |
-| [google-drive.ts](#google-drivets) | File upload/archive | ~400 |
+| [google-drive.ts](#google-drivets) | File upload/archive (race-protected) | ~460 |
 | [creatomate.ts](#creatomatets) | Video rendering API | ~210 |
 | [renderQueue.ts](#renderqueuets) | Render job management | ~300 |
 | [blocked-dealers.ts](#blocked-dealersts) | Email blocklist | ~40 |
@@ -146,7 +146,7 @@ await sendFbAdminAcceptedEmail('10251015');
 
 ## google-drive.ts
 
-**Purpose:** Upload files to Google Drive dealer folders.
+**Purpose:** Upload files to Google Drive dealer folders with race condition protection.
 
 **Key Functions:**
 
@@ -157,7 +157,29 @@ await sendFbAdminAcceptedEmail('10251015');
 | `uploadLogoToStaging(logoUrl, filename)` | Upload to staging folder |
 | `archiveOldPosts(dealerNo, activePostNums)` | Move old videos to Archive/ |
 | `getDealerFolder(dealerNo)` | Get or create dealer folder |
+| `getFolderIdByPath(path)` | Get folder ID by path (shared, race-safe) |
 | `listDealerFiles(dealerNo)` | List files in dealer folder |
+
+**Race Condition Protection (ensureFolderPath):**
+
+When multiple Creatomate webhooks arrive simultaneously for the same dealer, concurrent
+calls to create folders can produce duplicates. Two layers of protection:
+
+1. **In-process promise lock** (`folderCreationLocks` Map, line 120) — concurrent calls
+   for the same path within the same serverless instance share a single creation promise.
+2. **Post-creation verification** (line 170-202) — after creating a folder, re-queries
+   Google Drive. If duplicates exist, keeps the oldest and deletes the rest.
+
+```typescript
+// Layer 1: In-process lock prevents concurrent creation
+const folderCreationLocks = new Map<string, Promise<string>>();
+
+// Layer 2: Post-creation verification detects cross-instance races
+const verifyFolders = await drive.files.list({ q: query });
+if (verifyFolders.data.files.length > 1) {
+  // Keep oldest, delete duplicates
+}
+```
 
 **Folder Structure:**
 ```
