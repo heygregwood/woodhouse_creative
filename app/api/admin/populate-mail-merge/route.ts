@@ -68,7 +68,7 @@ export async function GET() {
 
     // Format for preview (all dealers - no duplicate checking)
     const preview: MailMergeDealer[] = contentDealers.map((d) => {
-      const isArmstrong = d.armstrong_air === 1 || d.armstrong_air === true;
+      const isArmstrong = d.armstrong_air === 1;
       return {
         firstName: d.contact_first_name || '',
         businessName: d.dealer_name || '',
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Format rows for spreadsheet (all dealers - no duplicate checking)
     const rows = contentDealers.map((d) => {
-      const isArmstrong = d.armstrong_air === 1 || d.armstrong_air === true;
+      const isArmstrong = d.armstrong_air === 1;
       return [
         d.contact_first_name || '',
         d.dealer_name || '',
