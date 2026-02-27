@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude Code session management (machine-local)
 .claude/active-plan.json
+
+# Data exploration (not for production - contains dealer PII and analysis)
+data-exploration/

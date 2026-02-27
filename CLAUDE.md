@@ -725,6 +725,7 @@ import type { Dealer } from '@/lib/types/dealer';
 | Admin dashboard | `docs/product/ADMIN_DASHBOARD.md` |
 | Development workflow | `docs/playbook/DEVELOPMENT_WORKFLOW.md` |
 | Compliance guide | `docs/playbook/COMPLIANCE_GUIDE.md` |
+| Prospect data collection | `docs/product/PROSPECT_DATA.md` |
 
 ### Documentation Structure
 ```
@@ -743,6 +744,7 @@ docs/
 │   ├── ADMIN_DASHBOARD.md       # Dashboard features
 │   ├── DEALER_LIFECYCLE.md      # Dealer states/transitions
 │   ├── EMAIL_AUTOMATION.md      # Email system
+│   ├── PROSPECT_DATA.md         # Prospect dealers collection (WH Social)
 │   ├── RENDER_PIPELINE.md       # Video rendering
 │   └── SPREADSHEET_SYSTEM.md    # Google Sheets integration
 ├── playbook/                    # Operational guides
@@ -1446,13 +1448,14 @@ OneDrive/Woodhouse Business/Woodhouse_Social/Prospecting/Allied Air Dealers All 
 └── README.md          ← Full documentation of all files
 ```
 
-### Key Finding: pe_allied_dealers is Stale
-The `pe_allied_dealers` collection in woodhouse_social (7,105 records from a 2023 CSV) has inaccurate segmentation. 162 "winback" dealers are actually Active. 77 "active suppress" dealers have opted out. Should be rebuilt from API ground truth. See `analysis/cross-reference-report.txt` for details.
+### pe_allied_dealers Rebuilt (Feb 27, 2026)
+The `pe_allied_dealers` collection was rebuilt from API ground truth on Feb 27, 2026 (33,867 dealers, 6 segments). Then matched against pe_prospects: 4,712 high-confidence matches found (phone/email/domain), bringing total Allied-linked prospects to 8,764. Bidirectional enrichment applied. 291 current_turnkey prospects suppressed. See `analysis/cross-reference-report.txt` for the original stale data analysis.
 
 ---
 
 ## What's Next
 
-- **Rebuild pe_allied_dealers** from Allied API ground truth (in woodhouse_social)
-- **Deactivated dealer prospecting** — 59% of D dealers with websites are still live businesses
+- **Fuzzy matching review** — 758 name+city+state matches identified but not applied (some false positives in sample). Review and potentially apply.
+- **Deactivated dealer website crawl** — Only 100 of ~24K deactivated dealers crawled (59% had live websites). Broader crawl needed to identify out-of-business dealers.
 - **Automate periodic API sync** — replace Excel-based sync with direct API pull
+- **Ambiguous match resolution** — 888 one-to-many matches (one Allied dealer matched multiple prospects) not yet resolved

@@ -6,6 +6,79 @@ All notable changes to Woodhouse Creative are documented here.
 
 ---
 
+## [2026-02-27] - Allied ↔ Prospect Matching & Enrichment
+
+### What
+Matched pe_allied_dealers (33,867) against pe_prospects (145,483) using phone, email, and domain matching. Found 4,712 new high-confidence matches (total Allied-linked prospects now 8,764). Bidirectional enrichment: Allied dealers got Google Maps contacts, prospects got Allied API contacts. 291 current_turnkey prospects suppressed with triple flags.
+
+### Results
+- **4,712 new matches** — phone exact: 4,398, email exact: 131, domain exact: 183
+- **8,764 total** pe_prospects with is_allied=true (was 4,052)
+- **7,140 emails + 2,294 phones** added to pe_prospects from Allied API
+- **6,851 Allied dealers** enriched with prospect_contacts from Google Maps
+- **291 current_turnkey** prospects suppressed (outreach_status='allied_dealer', email_opted_out=true)
+- **758 fuzzy matches** (name+city+state) identified, not yet applied — sample had some false positives
+
+### Added
+- **`scripts/export-for-matching.ts`** — Exports pe_prospects + pe_allied_dealers to JSON for matching
+- **`scripts/match-allied-to-prospects.py`** — 3-tier cascade matching (phone → email → domain) + fuzzy name+city+state
+- **`scripts/apply-allied-matches.ts`** — Applies approved match CSV to pe_prospects (--dry-run / --write)
+- **`scripts/enrich-allied-prospect-matches.ts`** — Bidirectional enrichment + current_turnkey suppression
+
+---
+
+## [2026-02-27] - pe_allied_dealers Rebuild Scripts
+
+### Added
+- **`scripts/build-pe-allied-dealers.py`** — Builds pe_allied_dealers JSON from Allied Air API CSV + prospect_dealers scoring + WC suppression list
+  - Reads 33,867 dealers from API flat CSV (OneDrive)
+  - Enriches 672 with scoring from prospect_dealers (Firestore)
+  - Segments using WC dealers (376 current_turnkey suppressed)
+  - Outputs `/tmp/pe-allied-dealers.json`
+
+- **`scripts/load-pe-allied-dealers.ts`** — Loads JSON into woodhouse_social default Firestore db
+  - Targets pe_allied_dealers collection in DEFAULT database (not woodhouse-creative-db)
+  - --dry-run and --write modes
+  - Deletes old collection before writing
+
+- **`scripts/export-wc-dealers.ts`** — Exports WC dealer numbers for suppression list
+- **`scripts/migrate-allied-fk.ts`** (in woodhouse_social) — Migrated pe_prospects FK from AAE_ prefix to clean dealer_no
+
+---
+
+## [2026-02-26] - Prospect Dealers Data Collection
+
+### Added
+- **`prospect_dealers` Firestore collection** — New collection in `woodhouse-creative-db` for Woodhouse Social prospecting
+  - Combines 4 data sources: Exploration Excel (676 dealers), Sprout Post Performance (38,507 posts), Sprout Facebook Pages (505K rows), Sprout Profile Performance (504K rows)
+  - 423 targetable removed dealers scored and tiered (55 hot, 67 warm, 301 cold)
+  - Page status weather system: dark/grey/cloudy/sunny/tornado based on posting frequency
+  - Composite prospect scoring (0-10 scale) from engagement, followers, PMs, page actions, tier investment
+
+- **`scripts/build-prospect-data.py`** — Python script to process all data sources into `/tmp/prospect-dealers.json`
+  - Reads and deduplicates Exploration Excel (740 → 676 unique dealers)
+  - Deduplicates 7 overlapping Sprout CSVs by Post ID (61,965 → 38,507 unique posts)
+  - Matches Sprout profiles to dealers via Facebook Page Name (188 matched)
+  - Computes derived signals: experience level (A-E), ever_had_fb_admin, enrollment/posting duration
+  - Computes page status and prospect score
+
+- **`scripts/load-prospect-dealers.ts`** — TypeScript Firestore loader
+  - Reads JSON from build script, batch-writes to `prospect_dealers` collection
+  - Supports `--dry-run` and `--input` flags
+  - Idempotent (safe to re-run)
+
+- **`docs/product/PROSPECT_DATA.md`** — Full documentation
+  - Business context (experience levels, weather metaphor, scoring formula)
+  - Complete field reference (40+ fields with types, sources, descriptions)
+  - Data pipeline instructions and query examples
+
+### Files Changed
+- `scripts/build-prospect-data.py` (NEW) — Data processing pipeline
+- `scripts/load-prospect-dealers.ts` (NEW) — Firestore loader
+- `docs/product/PROSPECT_DATA.md` (NEW) — Collection documentation
+
+---
+
 ## [2026-02-05] - Removed FULL Dealer Spreadsheet Cleanup Tracking
 
 ### Added
