@@ -150,6 +150,7 @@ async function main() {
     // Process each matched prospect
     for (const pDoc of prospectDocs) {
       const pData = pDoc.data();
+      if (!pData) continue;
       const pTitle = (pData.title as string) || '';
       const existingEmails = new Set(
         ((pData.emails as string[]) || []).map((e: string) => e.trim().toLowerCase())

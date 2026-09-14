@@ -71,7 +71,7 @@ export default function CreativeAdminPage() {
             <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-lg font-semibold text-text">Sync from Allied Excel</h2>
+                  <h2 className="text-lg font-semibold text-text">Sync with Allied Air Data Feed</h2>
                   <p className="text-sm text-gray-500 mt-1">Check for new/changed dealers</p>
                 </div>
                 <a
@@ -89,7 +89,7 @@ export default function CreativeAdminPage() {
                 disabled={syncing}
                 className="w-full px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed font-semibold transition-colors"
               >
-                {syncing ? 'Syncing...' : 'Sync from Excel'}
+                {syncing ? 'Syncing...' : 'Sync'}
               </button>
               <p className="text-xs text-gray-500 text-center">
                 New dealers are auto-added with welcome emails
