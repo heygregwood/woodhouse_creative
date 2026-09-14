@@ -541,7 +541,7 @@ export default function SchedulingPage() {
           <div className="bg-white border border-border rounded-lg shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-border">
               <h2 className="text-lg font-semibold text-text">Batch Video Render</h2>
-              <p className="text-sm text-gray-500 mt-1">Render videos via Creatomate</p>
+              <p className="text-sm text-gray-500 mt-1">Render personalized videos</p>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-3">
@@ -552,7 +552,7 @@ export default function SchedulingPage() {
                 {batchInputs.map((batch, index) => (
                   <div key={index} className="flex gap-2 items-center">
                     <input type="number" className="w-24 p-2 border border-gray-300 rounded-lg focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none text-sm" value={batch.postNumber} onChange={(e) => handleBatchChange(index, 'postNumber', e.target.value)} placeholder="Post #" />
-                    <input type="text" className="flex-1 p-2 border border-gray-300 rounded-lg font-mono text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={batch.templateId} onChange={(e) => handleBatchChange(index, 'templateId', e.target.value)} placeholder="Creatomate Template ID" />
+                    <input type="text" className="flex-1 p-2 border border-gray-300 rounded-lg font-mono text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" value={batch.templateId} onChange={(e) => handleBatchChange(index, 'templateId', e.target.value)} placeholder="Template ID" />
                     {batchInputs.length > 1 && (
                       <button onClick={() => handleRemoveBatch(index)} className="p-2 text-red-500 hover:bg-red-50 rounded">&times;</button>
                     )}

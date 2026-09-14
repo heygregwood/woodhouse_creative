@@ -235,7 +235,7 @@ export default function PostsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Creatomate Template ID</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Template ID</label>
                   <input
                     type="text"
                     className="w-full p-2 border border-gray-300 rounded-lg font-mono text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none"
@@ -403,7 +403,7 @@ export default function PostsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <a href={`https://creatomate.com/projects/${CREATOMATE_PROJECT_ID}/templates/${post.templateId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-3 py-1.5 text-sm bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors">Open in Creatomate</a>
+                            <a href={`https://creatomate.com/projects/${CREATOMATE_PROJECT_ID}/templates/${post.templateId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="px-3 py-1.5 text-sm bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors">Open Template</a>
                             <span className="text-gray-400 text-xl">{expandedPosts.has(post.postNumber) ? '▼' : '▶'}</span>
                           </div>
                         </div>
